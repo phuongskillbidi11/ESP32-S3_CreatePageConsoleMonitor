@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32-S3 Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #terminal {
+      height: 200px;
+      overflow-y: auto;
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: monospace;
+      padding: 10px;
+    }
+    .input-status {
+      background-color: #e0e0e0;
+      padding: 5px;
+      border-radius: 4px;
+      margin: 2px 0;
+    }
+    .output-btn {
+      transition: background-color 0.3s;
+    }
+    .output-btn.on {
+      background-color: #10b981; /* Xanh lá */
+    }
+    .output-btn.off {
+      background-color: #ef4444; /* Đỏ */
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4">
+    <!-- Header -->
+    <div id="dashboard" class="mb-6">
+      <h1 class="text-2xl font-bold mb-4">ESP32-S3 Dashboard</h1>
+      <p id="connection-status" class="mb-4 text-lg">WebSocket: Disconnected</p>
+      <div class="flex space-x-4">
+        <button onclick="showPage('console')" class="bg-blue-500 text-white px-4 py-2 rounded">Console</button>
+        <button onclick="showPage('lora')" class="bg-blue-500 text-white px-4 py-2 rounded">LoRa Settings</button>
+      </div>
+    </div>
+
+    <!-- Console Page -->
+    <div id="console" class="hidden">
+      <h2 class="text-xl font-bold mb-4">Console</h2>
+      <div id="terminal" class="mb-6"></div>
+
+      <!-- Input Status Section -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">Input Status</h3>
+        <div id="input-status" class="grid grid-cols-1 gap-2"></div>
+      </div>
+
+      <!-- Output Controls Section -->
+      <div>
+        <h3 class="font-semibold text-lg mb-2">Output Controls</h3>
+        <div id="output-controls" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+      </div>
+
+      <!-- System Status Section -->
+      <div class="mt-6">
+        <h3 class="font-semibold text-lg mb-2">System Status</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <p>Reset Count: <span id="reset-count">0</span></p>
+          <p>Free Heap: <span id="free-heap">0</span> bytes</p>
+          <p>Free PSRAM: <span id="free-psram">0</span> bytes</p>
+          <p>Temperature: <span id="temperature">0</span> °C</p>
+          <p>IP Address: <span id="ip-address">0.0.0.0</span></p>
+          <p>Uptime: <span id="uptime">0</span> ms</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- LoRa Settings Page -->
+    <div id="lora" class="hidden">
+      <h2 class="text-xl font-bold mb-4">LoRa Settings</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block mb-1">Frequency (Hz):</label>
+          <input id="lora-frequency" type="number" class="border p-2 w-full" value="433000000">
+        </div>
+        <div>
+          <label class="block mb-1">Bandwidth (kHz):</label>
+          <input id="lora-bandwidth" type="number" class="border p-2 w-full" value="125.0">
+        </div>
+        <div>
+          <label class="block mb-1">Spreading Factor:</label>
+          <select id="lora-spreading-factor" class="border p-2 w-full">
+            <option value="6">6</option>
+            <option value="7" selected>7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+        <div>
+          <label class="block mb-1">Coding Rate:</label>
+          <select id="lora-coding-rate" class="border p-2 w-full">
+            <option value="5" selected>5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
+        </div>
+        <div>
+          <label class="block mb-1">Preamble Length:</label>
+          <input id="lora-preamble-length" type="number" class="border p-2 w-full" value="8">
+        </div>
+        <div>
+          <label class="block mb-1">Sync Word:</label>
+          <input id="lora-sync-word" type="number" class="border p-2 w-full" value="18">
+        </div>
+        <div>
+          <label class="block mb-1">Power (dBm):</label>
+          <input id="lora-power" type="number" class="border p-2 w-full" value="17">
+        </div>
+      </div>
+      <button onclick="saveLoRaConfig()" class="mt-4 bg-green-500 text-white px-4 py-2 rounded">Save LoRa Settings</button>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    const terminal = document.getElementById('terminal');
+
+    function showPage(pageId) {
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('console').classList.add('hidden');
+      document.getElementById('lora').classList.add('hidden');
+      document.getElementById(pageId).classList.remove('hidden');
+    }
+
+    function appendTerminal(message) {
+      // Thay thế ký tự xuống dòng bằng <br> để hiển thị đúng trong HTML
+      const formattedMessage = message.replace(/\n/g, '<br>');
+      terminal.innerHTML += formattedMessage + '<br>';
+      terminal.scrollTop = terminal.scrollHeight;
+      if (terminal.childElementCount > 100) {
+        terminal.removeChild(terminal.firstChild);
+      }
+    }
+
+    function toggleOutput(pin) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const button = document.getElementById(`output-btn-${pin}`);
+        const state = button.classList.contains('on');
+        button.classList.toggle('on', !state);
+        button.classList.toggle('off', state);
+        button.textContent = state ? 'OFF' : 'ON';
+        ws.send(JSON.stringify({
+          action: 'control_output',
+          pin: pin,
+          state: !state
+        }));
+      }
+    }
+
+    function updateStatus(data) {
+      // Ghi dữ liệu WebSocket vào console của trình duyệt
+      console.log('WebSocket data received:', data);
+
+      if (data.action === 'system_status') {
+        document.getElementById('reset-count').textContent = data.reset_count;
+        document.getElementById('free-heap').textContent = data.free_heap;
+        document.getElementById('free-psram').textContent = data.free_psram;
+        document.getElementById('temperature').textContent = data.temperature.toFixed(2);
+        document.getElementById('ip-address').textContent = data.ip_address;
+        document.getElementById('uptime').textContent = data.uptime;
+
+        // Update Input Status
+        const inputStatus = document.getElementById('input-status');
+        inputStatus.innerHTML = '';
+        data.inputs.forEach(input => {
+          inputStatus.innerHTML += `
+            <div class="input-status">
+              Pin ${input.pin}: ${input.state}
+            </div>`;
+          if (document.getElementById(`input-${input.pin}`)?.dataset.state !== input.state) {
+            appendTerminal(`Pin ${input.pin} changed to ${input.state}`);
+          }
+          if (document.getElementById(`input-${input.pin}`)) {
+            document.getElementById(`input-${input.pin}`).dataset.state = input.state;
+          }
+        });
+
+        // Update Output Controls
+        const outputControls = document.getElementById('output-controls');
+        outputControls.innerHTML = '';
+        data.outputs.forEach(output => {
+          outputControls.innerHTML += `
+            <button id="output-btn-${output.pin}" 
+                    class="output-btn px-4 py-2 rounded text-white ${output.state === 'HIGH' ? 'on' : 'off'}"
+                    onclick="toggleOutput(${output.pin})">
+              ${output.state === 'HIGH' ? 'ON' : 'OFF'}
+            </button>`;
+        });
+      } else if (data.action === 'lora_config_data') {
+        document.getElementById('lora-frequency').value = data.frequency;
+        document.getElementById('lora-bandwidth').value = data.bandwidth / 1000;
+        document.getElementById('lora-spreading-factor').value = data.spreadingFactor;
+        document.getElementById('lora-coding-rate').value = data.codingRate;
+        document.getElementById('lora-preamble-length').value = data.preambleLength;
+        document.getElementById('lora-sync-word').value = data.syncWord;
+        document.getElementById('lora-power').value = data.txPower;
+        appendTerminal('LoRa configuration loaded');
+      } else if (data.action === 'lora_config_saved') {
+        appendTerminal('LoRa configuration saved successfully');
+      } else if (data.action === 'debug') {
+        appendTerminal(data.message);
+      }
+    }
+
+    function saveLoRaConfig() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const frequency = parseInt(document.getElementById('lora-frequency').value);
+        const bandwidth = parseFloat(document.getElementById('lora-bandwidth').value) * 1000;
+        const spreadingFactor = parseInt(document.getElementById('lora-spreading-factor').value);
+        const codingRate = parseInt(document.getElementById('lora-coding-rate').value);
+        const preambleLength = parseInt(document.getElementById('lora-preamble-length').value);
+        const syncWord = parseInt(document.getElementById('lora-sync-word').value);
+        const txPower = parseInt(document.getElementById('lora-power').value);
+
+        // Xác thực tham số LoRa
+        if (frequency < 400000000 || frequency > 1000000000) {
+          appendTerminal('Lỗi: Tần số phải nằm trong khoảng 400MHz đến 1000MHz');
+          return;
+        }
+        if (txPower < 2 || txPower > 20) {
+          appendTerminal('Lỗi: Công suất phải nằm trong khoảng 2 đến 20 dBm');
+          return;
+        }
+        if (spreadingFactor < 6 || spreadingFactor > 12) {
+          appendTerminal('Lỗi: Spreading Factor phải nằm trong khoảng 6 đến 12');
+          return;
+        }
+        if (codingRate < 5 || codingRate > 8) {
+          appendTerminal('Lỗi: Coding Rate phải nằm trong khoảng 5 đến 8');
+          return;
+        }
+        if (preambleLength < 6) {
+          appendTerminal('Lỗi: Preamble Length phải lớn hơn hoặc bằng 6');
+          return;
+        }
+        if (syncWord < 0 || syncWord > 255) {
+          appendTerminal('Lỗi: Sync Word phải nằm trong khoảng 0 đến 255');
+          return;
+        }
+
+        const config = {
+          action: 'save_lora_config',
+          frequency: frequency,
+          bandwidth: bandwidth,
+          spreadingFactor: spreadingFactor,
+          codingRate: codingRate,
+          preambleLength: preambleLength,
+          syncWord: syncWord,
+          txPower: txPower
+        };
+        ws.send(JSON.stringify(config));
+      }
+    }
+
+    function initWebSocket() {
+      ws = new WebSocket(`ws://172.22.38.207/ws`);
+      ws.onopen = () => {
+        document.getElementById('connection-status').textContent = 'WebSocket: Connected';
+        appendTerminal('WebSocket connected');
+        ws.send(JSON.stringify({ action: 'get_lora_config' }));
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (!data.action) {
+            appendTerminal('Lỗi: Nhận được tin nhắn WebSocket không hợp lệ');
+            return;
+          }
+          updateStatus(data);
+        } catch (e) {
+          appendTerminal('Lỗi: Không thể phân tích tin nhắn WebSocket');
+        }
+      };
+      ws.onclose = () => {
+        document.getElementById('connection-status').textContent = 'WebSocket: Disconnected';
+        appendTerminal('WebSocket disconnected');
+        setTimeout(initWebSocket, 5000);
+      };
+    }
+
+    initWebSocket();
+    showPage('dashboard');
+  </script>
+</body>
+</html>
