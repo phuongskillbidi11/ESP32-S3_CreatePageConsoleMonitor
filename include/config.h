@@ -4,27 +4,27 @@
 #include <Arduino.h>
 
 // WiFi Configuration
-// const char* WIFI_SSID = "I-Soft";
-// const char* WIFI_PASSWORD = "i-soft@2023";
-const char* WIFI_SSID = "Galaxy M12 A5AB";
-const char* WIFI_PASSWORD = "88888888";
+const char* WIFI_SSID = "Heo vang 2019";
+const char* WIFI_PASSWORD = "Hungthinh210315";
 
 // WebSocket Configuration
 const int WEBSOCKET_PORT = 80;
 const char* WEBSOCKET_PATH = "/ws";
 
-// Input Pin Configuration (7 inputs)
-const int INPUT_PINS[7] = {4, 5, 13, 14, 15, 16, 17};
-const int NUM_INPUTS = 7;
+// Input Pin Configuration
+const int INPUT_PINS[5] = {4, 5, 13, 14, 19};
+const int NUM_INPUTS = 5;
 
-// Output Pin Configuration (7 outputs)
-const int OUTPUT_PINS[7] = {18, 19, 21, 22, 23, 25, 26};
-const int NUM_OUTPUTS = 7;
+// Output Pin Configuration
+const int OUTPUT_PINS[5] = {21, 22, 23, 25, 26};
+const int NUM_OUTPUTS = 5;
 
-// LoRa Configuration Pins
-const int LORA_CS = 5;
-const int LORA_RST = 14;
-const int LORA_IRQ = 2;
+// LoRa E32 Configuration Pins
+#define E32_M0_PIN    15
+#define E32_M1_PIN    16
+#define E32_TX_PIN    17  // TX của ESP32 → RX của E32
+#define E32_RX_PIN    18  // RX của ESP32 → TX của E32
+#define E32_AUX_PIN   -1  // Không sử dụng AUX
 
 // System Monitor Configuration
 const unsigned long MONITOR_INTERVAL = 2000; // 2 seconds
@@ -57,15 +57,31 @@ struct OutputStatus {
   String stateStr;
 };
 
-// Structure for LoRa configuration
-struct LoRaConfig {
-  long frequency = 433E6;          // Frequency in Hz (433MHz)
-  int spreadingFactor = 7;         // Spreading factor (6-12)
-  long bandwidth = 125E3;          // Bandwidth in Hz (125kHz)
-  int codingRate = 5;              // Coding rate (5-8)
-  long preambleLength = 8;         // Preamble length
-  int syncWord = 0x12;             // Sync word (0x12 is default)
-  int txPower = 17;                // TX power in dBm (2-20)
+// Structure for LoRa E32 configuration
+struct LoRaE32Config {
+  bool initialized = false;
+  String moduleInfo = "";
+  String configInfo = "";
+  uint8_t addh = 0;
+  uint8_t addl = 0;
+  uint8_t chan = 0;
+  String frequency = "";
+  String airDataRateStr = ""; // Renamed to avoid conflict
+  String uartBaudRateStr = "";
+  String transmissionPowerStr = "";
+  String parityBit = "";
+  String wirelessWakeupTimeStr = "";
+  String fecStr = "";
+  String fixedTransmissionStr = "";
+  String ioDriveModeStr = "";
+  uint8_t uartParity = 0;         // 0b00: 8N1, 0b01: 8O1, 0b10: 8E1
+  uint8_t uartBaudRate = 0b011;  // e.g., 0b011 for 9600
+  uint8_t airDataRate = 0b010;   // e.g., 0b010 for 2.4kbps
+  uint8_t fixedTransmission = 0; // 0: Transparent, 1: Fixed
+  uint8_t ioDriveMode = 1;       // 0: Open-collector, 1: Push-pull
+  uint8_t wirelessWakeupTime = 0;// 0b000: 250ms, etc.
+  uint8_t fec = 1;               // 0: Off, 1: On
+  uint8_t transmissionPower = 0b11; // e.g., 0b11 for 20dBm
 };
 
 // Structure for system status
@@ -78,6 +94,12 @@ struct SystemStatus {
   float temperature;
   String ipAddress;
   unsigned long uptime;
+  LoRaE32Config loraE32;
 };
+
+// Function declarations
+void saveLoRaConfig();
+void loadLoRaConfig();
+void setLoRaConfig(LoRaE32Config config);
 
 #endif

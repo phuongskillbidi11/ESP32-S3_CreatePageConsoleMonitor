@@ -29,6 +29,25 @@
     .output-btn.off {
       background-color: #ef4444; /* Đỏ */
     }
+    .lora-info {
+      background-color: #f3f4f6;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 5px 0;
+    }
+    .lora-info-label {
+      font-weight: bold;
+      color: #374151;
+    }
+    .lora-info-value {
+      color: #1f2937;
+    }
+    select, input[type="number"] {
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 5px;
+      width: 100%;
+    }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -39,7 +58,7 @@
       <p id="connection-status" class="mb-4 text-lg">WebSocket: Disconnected</p>
       <div class="flex space-x-4">
         <button onclick="showPage('console')" class="bg-blue-500 text-white px-4 py-2 rounded">Console</button>
-        <button onclick="showPage('lora')" class="bg-blue-500 text-white px-4 py-2 rounded">LoRa Settings</button>
+        <button onclick="showPage('lora')" class="bg-blue-500 text-white px-4 py-2 rounded">LoRa E32 Info</button>
       </div>
     </div>
 
@@ -74,53 +93,144 @@
       </div>
     </div>
 
-    <!-- LoRa Settings Page -->
+    <!-- LoRa E32 Info Page -->
     <div id="lora" class="hidden">
-      <h2 class="text-xl font-bold mb-4">LoRa Settings</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block mb-1">Frequency (Hz):</label>
-          <input id="lora-frequency" type="number" class="border p-2 w-full" value="433000000">
+      <h2 class="text-xl font-bold mb-4">LoRa E32 Information</h2>
+      
+      <!-- Module Status -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">Module Status</h3>
+        <div class="lora-info">
+          <span class="lora-info-label">Initialized:</span>
+          <span id="lora-initialized" class="lora-info-value">NO</span>
         </div>
-        <div>
-          <label class="block mb-1">Bandwidth (kHz):</label>
-          <input id="lora-bandwidth" type="number" class="border p-2 w-full" value="125.0">
-        </div>
-        <div>
-          <label class="block mb-1">Spreading Factor:</label>
-          <select id="lora-spreading-factor" class="border p-2 w-full">
-            <option value="6">6</option>
-            <option value="7" selected>7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10">10</option>
-            <option value="11">11</option>
-            <option value="12">12</option>
-          </select>
-        </div>
-        <div>
-          <label class="block mb-1">Coding Rate:</label>
-          <select id="lora-coding-rate" class="border p-2 w-full">
-            <option value="5" selected>5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-          </select>
-        </div>
-        <div>
-          <label class="block mb-1">Preamble Length:</label>
-          <input id="lora-preamble-length" type="number" class="border p-2 w-full" value="8">
-        </div>
-        <div>
-          <label class="block mb-1">Sync Word:</label>
-          <input id="lora-sync-word" type="number" class="border p-2 w-full" value="18">
-        </div>
-        <div>
-          <label class="block mb-1">Power (dBm):</label>
-          <input id="lora-power" type="number" class="border p-2 w-full" value="17">
+        <div class="lora-info">
+          <span class="lora-info-label">Module Info:</span>
+          <span id="lora-module-info" class="lora-info-value">Not available</span>
         </div>
       </div>
-      <button onclick="saveLoRaConfig()" class="mt-4 bg-green-500 text-white px-4 py-2 rounded">Save LoRa Settings</button>
+
+      <!-- Address Configuration -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">Address Configuration</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="lora-info">
+            <span class="lora-info-label">High Address (ADDH):</span>
+            <input type="number" id="lora-addh" value="0" min="0" max="255" class="lora-info-value">
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Low Address (ADDL):</span>
+            <input type="number" id="lora-addl" value="0" min="0" max="255" class="lora-info-value">
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Channel (CHAN):</span>
+            <input type="number" id="lora-chan" value="0" min="0" max="31" class="lora-info-value">
+          </div>
+        </div>
+      </div>
+
+      <!-- RF Configuration -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">RF Configuration</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="lora-info">
+            <span class="lora-info-label">Air Data Rate:</span>
+            <select id="lora-air-data-rate" class="lora-info-value">
+              <option value="0">0.3kbps</option>
+              <option value="1">1.2kbps</option>
+              <option value="2" selected>2.4kbps</option>
+              <option value="3">4.8kbps</option>
+              <option value="4">9.6kbps</option>
+              <option value="5">19.2kbps</option>
+            </select>
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Transmission Power:</span>
+            <select id="lora-transmission-power" class="lora-info-value">
+              <option value="0">30dBm</option>
+              <option value="1">27dBm</option>
+              <option value="2">24dBm</option>
+              <option value="3" selected>20dBm</option>
+            </select>
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Wireless Wakeup Time:</span>
+            <select id="lora-wireless-wakeup-time" class="lora-info-value">
+              <option value="0" selected>250ms</option>
+              <option value="1">500ms</option>
+              <option value="2">750ms</option>
+              <option value="3">1000ms</option>
+              <option value="4">1250ms</option>
+              <option value="5">1500ms</option>
+              <option value="6">1750ms</option>
+              <option value="7">2000ms</option>
+            </select>
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">FEC:</span>
+            <select id="lora-fec" class="lora-info-value">
+              <option value="0">Off</option>
+              <option value="1" selected>On</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- UART Configuration -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">UART Configuration</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="lora-info">
+            <span class="lora-info-label">UART Baud Rate:</span>
+            <select id="lora-uart-baud-rate" class="lora-info-value">
+              <option value="0">1200</option>
+              <option value="1">2400</option>
+              <option value="2">4800</option>
+              <option value="3" selected>9600</option>
+              <option value="4">19200</option>
+              <option value="5">38400</option>
+              <option value="6">57600</option>
+              <option value="7">115200</option>
+            </select>
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Parity Bit:</span>
+            <select id="lora-parity-bit" class="lora-info-value">
+              <option value="0" selected>8N1</option>
+              <option value="1">8O1</option>
+              <option value="2">8E1</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options Configuration -->
+      <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">Options Configuration</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="lora-info">
+            <span class="lora-info-label">Fixed Transmission:</span>
+            <select id="lora-fixed-transmission" class="lora-info-value">
+              <option value="0" selected>Transparent</option>
+              <option value="1">Fixed</option>
+            </select>
+          </div>
+          <div class="lora-info">
+            <span class="lora-info-label">IO Drive Mode:</span>
+            <select id="lora-io-drive-mode" class="lora-info-value">
+              <option value="0">Open-collector</option>
+              <option value="1" selected>Push-pull</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="flex space-x-4">
+        <button onclick="refreshLoRaE32()" class="bg-green-500 text-white px-4 py-2 rounded">Refresh LoRa E32</button>
+        <button onclick="getLoRaE32Config()" class="bg-blue-500 text-white px-4 py-2 rounded">Get Configuration</button>
+        <button onclick="setLoRaE32Config()" class="bg-purple-500 text-white px-4 py-2 rounded">Set Configuration</button>
+      </div>
     </div>
   </div>
 
@@ -136,7 +246,6 @@
     }
 
     function appendTerminal(message) {
-      // Thay thế ký tự xuống dòng bằng <br> để hiển thị đúng trong HTML
       const formattedMessage = message.replace(/\n/g, '<br>');
       terminal.innerHTML += formattedMessage + '<br>';
       terminal.scrollTop = terminal.scrollHeight;
@@ -160,8 +269,46 @@
       }
     }
 
+    function refreshLoRaE32() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          action: 'refresh_lora_e32'
+        }));
+        appendTerminal('Refreshing LoRa E32 configuration...');
+      }
+    }
+
+    function getLoRaE32Config() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          action: 'get_lora_e32_config'
+        }));
+        appendTerminal('Getting LoRa E32 configuration...');
+      }
+    }
+
+    function setLoRaE32Config() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const config = {
+          action: 'set_lora_e32_config',
+          addh: parseInt(document.getElementById('lora-addh').value),
+          addl: parseInt(document.getElementById('lora-addl').value),
+          chan: parseInt(document.getElementById('lora-chan').value),
+          uartParity: parseInt(document.getElementById('lora-parity-bit').value),
+          uartBaudRate: parseInt(document.getElementById('lora-uart-baud-rate').value),
+          airDataRate: parseInt(document.getElementById('lora-air-data-rate').value),
+          fixedTransmission: parseInt(document.getElementById('lora-fixed-transmission').value),
+          ioDriveMode: parseInt(document.getElementById('lora-io-drive-mode').value),
+          wirelessWakeupTime: parseInt(document.getElementById('lora-wireless-wakeup-time').value),
+          fec: parseInt(document.getElementById('lora-fec').value),
+          transmissionPower: parseInt(document.getElementById('lora-transmission-power').value)
+        };
+        ws.send(JSON.stringify(config));
+        appendTerminal('Setting LoRa E32 configuration...');
+      }
+    }
+
     function updateStatus(data) {
-      // Ghi dữ liệu WebSocket vào console của trình duyệt
       console.log('WebSocket data received:', data);
 
       if (data.action === 'system_status') {
@@ -199,78 +346,36 @@
               ${output.state === 'HIGH' ? 'ON' : 'OFF'}
             </button>`;
         });
-      } else if (data.action === 'lora_config_data') {
-        document.getElementById('lora-frequency').value = data.frequency;
-        document.getElementById('lora-bandwidth').value = data.bandwidth / 1000;
-        document.getElementById('lora-spreading-factor').value = data.spreadingFactor;
-        document.getElementById('lora-coding-rate').value = data.codingRate;
-        document.getElementById('lora-preamble-length').value = data.preambleLength;
-        document.getElementById('lora-sync-word').value = data.syncWord;
-        document.getElementById('lora-power').value = data.txPower;
-        appendTerminal('LoRa configuration loaded');
-      } else if (data.action === 'lora_config_saved') {
-        appendTerminal('LoRa configuration saved successfully');
+
+        // Update LoRa E32 Information
+        if (data.loraE32) {
+          document.getElementById('lora-initialized').textContent = data.loraE32.initialized ? 'YES' : 'NO';
+          document.getElementById('lora-module-info').textContent = data.loraE32.moduleInfo || 'Not available';
+          document.getElementById('lora-addh').value = data.loraE32.addh || 0;
+          document.getElementById('lora-addl').value = data.loraE32.addl || 0;
+          document.getElementById('lora-chan').value = data.loraE32.chan || 0;
+          document.getElementById('lora-frequency').textContent = data.loraE32.frequency || 'Not available';
+          document.getElementById('lora-air-data-rate').value = data.loraE32.airDataRate ? data.loraE32.airDataRate.replace('kbps', '') : 2;
+          document.getElementById('lora-uart-baud-rate').value = data.loraE32.uartBaudRate ? data.loraE32.uartBaudRate : 3;
+          document.getElementById('lora-transmission-power').value = data.loraE32.transmissionPower ? data.loraE32.transmissionPower.replace('dBm', '') : 3;
+          document.getElementById('lora-parity-bit').value = data.loraE32.parityBit ? (data.loraE32.parityBit === '8N1' ? 0 : data.loraE32.parityBit === '8O1' ? 1 : 2) : 0;
+          document.getElementById('lora-wireless-wakeup-time').value = data.loraE32.wirelessWakeupTime ? data.loraE32.wirelessWakeupTime.replace('ms', '') / 250 : 0;
+          document.getElementById('lora-fec').value = data.loraE32.fec === 'On' ? 1 : 0;
+          document.getElementById('lora-fixed-transmission').value = data.loraE32.fixedTransmission === 'Transparent' ? 0 : 1;
+          document.getElementById('lora-io-drive-mode').value = data.loraE32.ioDriveMode === 'Push-pull' ? 1 : 0;
+        }
       } else if (data.action === 'debug') {
         appendTerminal(data.message);
       }
     }
 
-    function saveLoRaConfig() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const frequency = parseInt(document.getElementById('lora-frequency').value);
-        const bandwidth = parseFloat(document.getElementById('lora-bandwidth').value) * 1000;
-        const spreadingFactor = parseInt(document.getElementById('lora-spreading-factor').value);
-        const codingRate = parseInt(document.getElementById('lora-coding-rate').value);
-        const preambleLength = parseInt(document.getElementById('lora-preamble-length').value);
-        const syncWord = parseInt(document.getElementById('lora-sync-word').value);
-        const txPower = parseInt(document.getElementById('lora-power').value);
-
-        // Xác thực tham số LoRa
-        if (frequency < 400000000 || frequency > 1000000000) {
-          appendTerminal('Lỗi: Tần số phải nằm trong khoảng 400MHz đến 1000MHz');
-          return;
-        }
-        if (txPower < 2 || txPower > 20) {
-          appendTerminal('Lỗi: Công suất phải nằm trong khoảng 2 đến 20 dBm');
-          return;
-        }
-        if (spreadingFactor < 6 || spreadingFactor > 12) {
-          appendTerminal('Lỗi: Spreading Factor phải nằm trong khoảng 6 đến 12');
-          return;
-        }
-        if (codingRate < 5 || codingRate > 8) {
-          appendTerminal('Lỗi: Coding Rate phải nằm trong khoảng 5 đến 8');
-          return;
-        }
-        if (preambleLength < 6) {
-          appendTerminal('Lỗi: Preamble Length phải lớn hơn hoặc bằng 6');
-          return;
-        }
-        if (syncWord < 0 || syncWord > 255) {
-          appendTerminal('Lỗi: Sync Word phải nằm trong khoảng 0 đến 255');
-          return;
-        }
-
-        const config = {
-          action: 'save_lora_config',
-          frequency: frequency,
-          bandwidth: bandwidth,
-          spreadingFactor: spreadingFactor,
-          codingRate: codingRate,
-          preambleLength: preambleLength,
-          syncWord: syncWord,
-          txPower: txPower
-        };
-        ws.send(JSON.stringify(config));
-      }
-    }
-
     function initWebSocket() {
-      ws = new WebSocket(`ws://172.22.38.207/ws`);
+      ws = new WebSocket(`ws://192.168.0.105/ws`);
       ws.onopen = () => {
         document.getElementById('connection-status').textContent = 'WebSocket: Connected';
         appendTerminal('WebSocket connected');
-        ws.send(JSON.stringify({ action: 'get_lora_config' }));
+        // Request initial LoRa E32 configuration
+        ws.send(JSON.stringify({ action: 'get_lora_e32_config' }));
       };
       ws.onmessage = (event) => {
         try {
