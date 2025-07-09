@@ -48,6 +48,12 @@
       padding: 5px;
       width: 100%;
     }
+    .config-section {
+      display: none;
+    }
+    .config-section.active {
+      display: block;
+    }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -110,8 +116,22 @@
         </div>
       </div>
 
-      <!-- Address Configuration -->
+      <!-- Operating Mode -->
       <div class="mb-6">
+        <h3 class="font-semibold text-lg mb-2">Operating Mode</h3>
+        <div class="lora-info">
+          <span class="lora-info-label">Operating Mode:</span>
+          <select id="lora-operating-mode" class="lora-info-value" onchange="updateConfigVisibility()">
+            <option value="0" selected>Normal</option>
+            <option value="1">Wake-Up</option>
+            <option value="2">Power-Saving</option>
+            <option value="3">Sleep</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Address Configuration -->
+      <div id="address-config" class="config-section mb-6">
         <h3 class="font-semibold text-lg mb-2">Address Configuration</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="lora-info">
@@ -126,11 +146,15 @@
             <span class="lora-info-label">Channel (CHAN):</span>
             <input type="number" id="lora-chan" value="0" min="0" max="31" class="lora-info-value">
           </div>
+          <div class="lora-info">
+            <span class="lora-info-label">Frequency:</span>
+            <span id="lora-frequency" class="lora-info-value">Not available</span>
+          </div>
         </div>
       </div>
 
       <!-- RF Configuration -->
-      <div class="mb-6">
+      <div id="rf-config" class="config-section mb-6">
         <h3 class="font-semibold text-lg mb-2">RF Configuration</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="lora-info">
@@ -177,7 +201,7 @@
       </div>
 
       <!-- UART Configuration -->
-      <div class="mb-6">
+      <div id="uart-config" class="config-section mb-6">
         <h3 class="font-semibold text-lg mb-2">UART Configuration</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="lora-info">
@@ -205,7 +229,7 @@
       </div>
 
       <!-- Options Configuration -->
-      <div class="mb-6">
+      <div id="options-config" class="config-section mb-6">
         <h3 class="font-semibold text-lg mb-2">Options Configuration</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="lora-info">
@@ -229,7 +253,8 @@
       <div class="flex space-x-4">
         <button onclick="refreshLoRaE32()" class="bg-green-500 text-white px-4 py-2 rounded">Refresh LoRa E32</button>
         <button onclick="getLoRaE32Config()" class="bg-blue-500 text-white px-4 py-2 rounded">Get Configuration</button>
-        <button onclick="setLoRaE32Config()" class="bg-purple-500 text-white px-4 py-2 rounded">Set Configuration</button>
+        <button id="set-config-btn" onclick="setLoRaE32Config()" class="bg-purple-500 text-white px-4 py-2 rounded config-section">Set Configuration</button>
+        <button onclick="setLoRaOperatingMode()" class="bg-yellow-500 text-white px-4 py-2 rounded">Set Operating Mode</button>
       </div>
     </div>
   </div>
@@ -243,6 +268,9 @@
       document.getElementById('console').classList.add('hidden');
       document.getElementById('lora').classList.add('hidden');
       document.getElementById(pageId).classList.remove('hidden');
+      if (pageId === 'lora') {
+        updateConfigVisibility();
+      }
     }
 
     function appendTerminal(message) {
@@ -251,6 +279,20 @@
       terminal.scrollTop = terminal.scrollHeight;
       if (terminal.childElementCount > 100) {
         terminal.removeChild(terminal.firstChild);
+      }
+    }
+
+    function updateConfigVisibility() {
+      const operatingMode = document.getElementById('lora-operating-mode').value;
+      const configSections = ['address-config', 'rf-config', 'uart-config', 'options-config', 'set-config-btn'];
+      if (operatingMode === '3') { // Sleep Mode
+        configSections.forEach(section => {
+          document.getElementById(section).classList.add('active');
+        });
+      } else {
+        configSections.forEach(section => {
+          document.getElementById(section).classList.remove('active');
+        });
       }
     }
 
@@ -304,7 +346,19 @@
           transmissionPower: parseInt(document.getElementById('lora-transmission-power').value)
         };
         ws.send(JSON.stringify(config));
-        appendTerminal('Setting LoRa E32 configuration...');
+        appendTerminal('Setting LoRa E32 configuration (switching to Sleep Mode temporarily)...');
+      }
+    }
+
+    function setLoRaOperatingMode() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const mode = parseInt(document.getElementById('lora-operating-mode').value);
+        ws.send(JSON.stringify({
+          action: 'set_lora_operating_mode',
+          mode: mode
+        }));
+        appendTerminal(`Setting LoRa E32 operating mode to ${['Normal', 'Wake-Up', 'Power-Saving', 'Sleep'][mode]}...`);
+        updateConfigVisibility();
       }
     }
 
@@ -355,14 +409,18 @@
           document.getElementById('lora-addl').value = data.loraE32.addl || 0;
           document.getElementById('lora-chan').value = data.loraE32.chan || 0;
           document.getElementById('lora-frequency').textContent = data.loraE32.frequency || 'Not available';
-          document.getElementById('lora-air-data-rate').value = data.loraE32.airDataRate ? data.loraE32.airDataRate.replace('kbps', '') : 2;
-          document.getElementById('lora-uart-baud-rate').value = data.loraE32.uartBaudRate ? data.loraE32.uartBaudRate : 3;
-          document.getElementById('lora-transmission-power').value = data.loraE32.transmissionPower ? data.loraE32.transmissionPower.replace('dBm', '') : 3;
+        //   console.log('LoRa E32 Frequency:', data.loraE32.frequency);
+          document.getElementById('lora-air-data-rate').value = data.loraE32.airDataRate ? parseInt(data.loraE32.airDataRate.replace('kbps', '')) : 2;
+        //   console.log('LoRa E32 Air Data Rate:', data.loraE32.airDataRate);
+          document.getElementById('lora-uart-baud-rate').value = data.loraE32.uartBaudRate ? parseInt(data.loraE32.uartBaudRate) : 3;
+          document.getElementById('lora-transmission-power').value = data.loraE32.transmissionPower ? parseInt(data.loraE32.transmissionPower.replace('dBm', '')) : 3;
           document.getElementById('lora-parity-bit').value = data.loraE32.parityBit ? (data.loraE32.parityBit === '8N1' ? 0 : data.loraE32.parityBit === '8O1' ? 1 : 2) : 0;
-          document.getElementById('lora-wireless-wakeup-time').value = data.loraE32.wirelessWakeupTime ? data.loraE32.wirelessWakeupTime.replace('ms', '') / 250 : 0;
+          document.getElementById('lora-wireless-wakeup-time').value = data.loraE32.wirelessWakeupTime ? parseInt(data.loraE32.wirelessWakeupTime.replace('ms', '')) / 250 : 0;
           document.getElementById('lora-fec').value = data.loraE32.fec === 'On' ? 1 : 0;
           document.getElementById('lora-fixed-transmission').value = data.loraE32.fixedTransmission === 'Transparent' ? 0 : 1;
           document.getElementById('lora-io-drive-mode').value = data.loraE32.ioDriveMode === 'Push-pull' ? 1 : 0;
+          document.getElementById('lora-operating-mode').value = data.loraE32.operatingMode || 0;
+          updateConfigVisibility();
         }
       } else if (data.action === 'debug') {
         appendTerminal(data.message);
@@ -370,11 +428,11 @@
     }
 
     function initWebSocket() {
-      ws = new WebSocket(`ws://192.168.0.105/ws`);
+      ws = new WebSocket(`ws://192.168.0.117/ws`);
+
       ws.onopen = () => {
         document.getElementById('connection-status').textContent = 'WebSocket: Connected';
         appendTerminal('WebSocket connected');
-        // Request initial LoRa E32 configuration
         ws.send(JSON.stringify({ action: 'get_lora_e32_config' }));
       };
       ws.onmessage = (event) => {

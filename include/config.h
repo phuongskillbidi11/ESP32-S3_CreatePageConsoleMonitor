@@ -12,8 +12,8 @@ const int WEBSOCKET_PORT = 80;
 const char* WEBSOCKET_PATH = "/ws";
 
 // Input Pin Configuration
-const int INPUT_PINS[5] = {4, 5, 13, 14, 19};
-const int NUM_INPUTS = 5;
+const int INPUT_PINS[7] = {5, 6, 7, 37, 38, 39, 40};
+const int NUM_INPUTS = 7;
 
 // Output Pin Configuration
 const int OUTPUT_PINS[5] = {21, 22, 23, 25, 26};
@@ -66,7 +66,7 @@ struct LoRaE32Config {
   uint8_t addl = 0;
   uint8_t chan = 0;
   String frequency = "";
-  String airDataRateStr = ""; // Renamed to avoid conflict
+  String airDataRateStr = "";
   String uartBaudRateStr = "";
   String transmissionPowerStr = "";
   String parityBit = "";
@@ -82,6 +82,7 @@ struct LoRaE32Config {
   uint8_t wirelessWakeupTime = 0;// 0b000: 250ms, etc.
   uint8_t fec = 1;               // 0: Off, 1: On
   uint8_t transmissionPower = 0b11; // e.g., 0b11 for 20dBm
+  uint8_t operatingMode = 0;     // 0: Normal, 1: Wake-Up, 2: Power-Saving, 3: Sleep
 };
 
 // Structure for system status
@@ -101,5 +102,6 @@ struct SystemStatus {
 void saveLoRaConfig();
 void loadLoRaConfig();
 void setLoRaConfig(LoRaE32Config config);
+void setLoRaOperatingMode(uint8_t mode);
 
 #endif

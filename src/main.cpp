@@ -40,6 +40,7 @@ void loadIOConfig();
 void saveLoRaConfig();
 void loadLoRaConfig();
 void setLoRaConfig(LoRaE32Config config);
+void setLoRaOperatingMode(uint8_t mode);
 void clearTerminal();
 void controlOutput(int pin, bool state);
 void printModuleInformation(struct ModuleInformation moduleInformation);
@@ -99,6 +100,10 @@ void initLittleFS() {
 void initLoRaE32() {
   Serial.println("=== Initializing LoRa E32 ===");
   
+  // Thiết lập chân M0, M1 là OUTPUT
+  pinMode(E32_M0_PIN, OUTPUT);
+  pinMode(E32_M1_PIN, OUTPUT);
+  
   // Khởi tạo Serial1 với các chân đã định nghĩa
   Serial1.begin(9600, SERIAL_8N1, E32_RX_PIN, E32_TX_PIN);
   
@@ -107,6 +112,9 @@ void initLoRaE32() {
   
   // Load saved configuration if available
   loadLoRaConfig();
+  
+  // Đặt chế độ mặc định là Normal Mode
+  setLoRaOperatingMode(systemStatus.loraE32.operatingMode);
   
   Serial.println("Reading module information...");
   
@@ -147,7 +155,7 @@ void initLoRaE32() {
     
     printParameters(configuration);
     
-    // lưu cấu hình vào system status
+    // Lưu cấu hình vào system status
     systemStatus.loraE32.addh = configuration.ADDH;
     systemStatus.loraE32.addl = configuration.ADDL;
     systemStatus.loraE32.chan = configuration.CHAN;
@@ -195,6 +203,7 @@ void saveLoRaConfig() {
   loraE32["wirelessWakeupTime"] = systemStatus.loraE32.wirelessWakeupTime;
   loraE32["fec"] = systemStatus.loraE32.fec;
   loraE32["transmissionPower"] = systemStatus.loraE32.transmissionPower;
+  loraE32["operatingMode"] = systemStatus.loraE32.operatingMode;
   config["loraE32"] = loraE32;
 
   String jsonString = JSON.stringify(config);
@@ -240,9 +249,12 @@ void loadLoRaConfig() {
         systemStatus.loraE32.wirelessWakeupTime = (int)loraE32["wirelessWakeupTime"];
         systemStatus.loraE32.fec = (int)loraE32["fec"];
         systemStatus.loraE32.transmissionPower = (int)loraE32["transmissionPower"];
+        systemStatus.loraE32.operatingMode = (int)loraE32["operatingMode"];
         
-        // Apply loaded configuration to LoRa module
+        // Áp dụng cấu hình LoRa
         setLoRaConfig(systemStatus.loraE32);
+        // Áp dụng chế độ hoạt động
+        setLoRaOperatingMode(systemStatus.loraE32.operatingMode);
         
         Serial.println("LoRa E32 configuration loaded");
         sendDebugMessage("LoRa E32 configuration loaded from LittleFS");
@@ -253,7 +265,11 @@ void loadLoRaConfig() {
 
 // Set LoRa E32 configuration
 void setLoRaConfig(LoRaE32Config config) {
-  e32ttl100.setMode(MODE_3_PROGRAM);
+  // Lưu chế độ hoạt động hiện tại
+  uint8_t previousMode = systemStatus.loraE32.operatingMode;
+
+  // Chuyển module về chế độ Sleep để cấu hình
+  setLoRaOperatingMode(3); // MODE_3_PROGRAM
   delay(100);
 
   Configuration loraConfig;
@@ -275,7 +291,7 @@ void setLoRaConfig(LoRaE32Config config) {
     Serial.println("LoRa E32 configuration set successfully");
     sendDebugMessage("LoRa E32 configuration set successfully");
     
-    // Update system status
+    // Cập nhật trạng thái hệ thống
     systemStatus.loraE32.addh = config.addh;
     systemStatus.loraE32.addl = config.addl;
     systemStatus.loraE32.chan = config.chan;
@@ -297,10 +313,10 @@ void setLoRaConfig(LoRaE32Config config) {
     systemStatus.loraE32.fecStr = loraConfig.OPTION.getFECDescription();
     systemStatus.loraE32.transmissionPowerStr = loraConfig.OPTION.getTransmissionPowerDescription();
     
-    // Save configuration to LittleFS
+    // Lưu cấu hình vào LittleFS
     saveLoRaConfig();
     
-    // Read back configuration to update system status
+    // Đọc lại cấu hình để cập nhật trạng thái
     ResponseStructContainer configContainer = e32ttl100.getConfiguration();
     if (configContainer.status.code == 1) {
       Configuration newConfig = *(Configuration*)configContainer.data;
@@ -326,8 +342,48 @@ void setLoRaConfig(LoRaE32Config config) {
     sendDebugMessage("Error setting LoRa E32 configuration: " + String(rs.getResponseDescription()));
   }
 
-  e32ttl100.setMode(MODE_0_NORMAL);
+  // Khôi phục chế độ hoạt động trước đó
+  setLoRaOperatingMode(previousMode);
   delay(100);
+}
+
+// Set LoRa operating mode
+void setLoRaOperatingMode(uint8_t mode) {
+  switch (mode) {
+    case 0: // Normal Mode (M0=0, M1=0)
+      digitalWrite(E32_M0_PIN, LOW);
+      digitalWrite(E32_M1_PIN, LOW);
+      e32ttl100.setMode(MODE_0_NORMAL);
+      systemStatus.loraE32.operatingMode = 0;
+      sendDebugMessage("LoRa E32 set to Normal Mode");
+      break;
+    case 1: // Wake-Up Mode (M0=1, M1=0)
+      digitalWrite(E32_M0_PIN, HIGH);
+      digitalWrite(E32_M1_PIN, LOW);
+      e32ttl100.setMode(MODE_1_WAKE_UP);
+      systemStatus.loraE32.operatingMode = 1;
+      sendDebugMessage("LoRa E32 set to Wake-Up Mode");
+      break;
+    case 2: // Power-Saving Mode (M0=0, M1=1)
+      digitalWrite(E32_M0_PIN, LOW);
+      digitalWrite(E32_M1_PIN, HIGH);
+      e32ttl100.setMode(MODE_2_POWER_SAVING);
+      systemStatus.loraE32.operatingMode = 2;
+      sendDebugMessage("LoRa E32 set to Power-Saving Mode");
+      break;
+    case 3: // Sleep Mode (M0=1, M1=1)
+      digitalWrite(E32_M0_PIN, HIGH);
+      digitalWrite(E32_M1_PIN, HIGH);
+      e32ttl100.setMode(MODE_3_PROGRAM);
+      systemStatus.loraE32.operatingMode = 3;
+      sendDebugMessage("LoRa E32 set to Sleep Mode");
+      break;
+    default:
+      sendDebugMessage("Invalid LoRa E32 operating mode");
+      return;
+  }
+  saveLoRaConfig(); // Lưu chế độ vào LittleFS
+  delay(100); // Đợi module ổn định
 }
 
 // Print module information
@@ -578,6 +634,7 @@ void sendSystemStatus() {
     loraE32Obj["fec"] = systemStatus.loraE32.fecStr;
     loraE32Obj["fixedTransmission"] = systemStatus.loraE32.fixedTransmissionStr;
     loraE32Obj["ioDriveMode"] = systemStatus.loraE32.ioDriveModeStr;
+    loraE32Obj["operatingMode"] = systemStatus.loraE32.operatingMode;
     response["loraE32"] = loraE32Obj;
 
     String jsonString = JSON.stringify(response);
@@ -613,16 +670,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       controlOutput(pin, state);
     }
     else if (action == "get_lora_e32_config") {
-      // Send current LoRa E32 configuration
       sendSystemStatus();
     }
     else if (action == "refresh_lora_e32") {
-      // Refresh LoRa E32 configuration
       initLoRaE32();
       sendSystemStatus();
     }
     else if (action == "set_lora_e32_config") {
-      // Set LoRa E32 configuration
       LoRaE32Config config;
       config.addh = (int)json["addh"];
       config.addl = (int)json["addl"];
@@ -635,8 +689,14 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       config.wirelessWakeupTime = (int)json["wirelessWakeupTime"];
       config.fec = (int)json["fec"];
       config.transmissionPower = (int)json["transmissionPower"];
+      config.operatingMode = systemStatus.loraE32.operatingMode; // Giữ nguyên chế độ hiện tại
       
       setLoRaConfig(config);
+      sendSystemStatus();
+    }
+    else if (action == "set_lora_operating_mode") {
+      uint8_t mode = (int)json["mode"];
+      setLoRaOperatingMode(mode);
       sendSystemStatus();
     }
   }
@@ -647,18 +707,14 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
   switch (type) {
     case WS_EVT_CONNECT:
       Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-      // Send initial system status
       sendSystemStatus();
       break;
-
     case WS_EVT_DISCONNECT:
       Serial.printf("WebSocket client #%u disconnected\n", client->id());
       break;
-
     case WS_EVT_DATA:
       handleWebSocketMessage(arg, data, len);
       break;
-
     case WS_EVT_PONG:
     case WS_EVT_ERROR:
       break;
@@ -669,14 +725,10 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
 void initWebSocket() {
   ws.onEvent(onWebSocketEvent);
   server.addHandler(&ws);
-
-  // Serve static files from LittleFS
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/index.html", "text/html");
   });
-
   server.serveStatic("/", LittleFS, "/");
-
   server.begin();
   Serial.println("WebSocket server started");
 }
@@ -750,6 +802,9 @@ void updateSystemStatus() {
   statusMessage += String("IP Address: ") + systemStatus.ipAddress + "\n";
   statusMessage += String("Uptime: ") + systemStatus.uptime + " ms\n";
   statusMessage += String("LoRa E32 Initialized: ") + (systemStatus.loraE32.initialized ? "YES" : "NO") + "\n";
+  statusMessage += String("LoRa E32 Operating Mode: ") + (systemStatus.loraE32.operatingMode == 0 ? "Normal" : 
+                                                           systemStatus.loraE32.operatingMode == 1 ? "Wake-Up" : 
+                                                           systemStatus.loraE32.operatingMode == 2 ? "Power-Saving" : "Sleep") + "\n";
   statusMessage += "====================";
   sendDebugMessage(statusMessage);
 
@@ -779,35 +834,24 @@ void webSocketTask(void *pvParameters) {
 }
 
 void setup() {
-  // Initialize serial communication
   Serial.begin(SERIAL_BAUD_RATE);
   Serial.println("ESP32-S3 System Monitor Starting...");
 
-  // Increment reset counter
   reset_counter++;
   bootTime = millis();
 
-  // Initialize system components
   initInputs();
   initOutputs();
   initWiFi();
   initLittleFS();
-  
-  // Load I/O configuration
   loadIOConfig();
-  
-  // Initialize LoRa E32
   initLoRaE32();
-  
-  // Initialize WebSocket
   initWebSocket();
   sendDebugMessage("WebSocket server started");
 
-  // Initialize system status
   systemStatus.resetCount = reset_counter;
   systemStatus.ipAddress = WiFi.localIP().toString();
 
-  // Create FreeRTOS tasks
   xTaskCreatePinnedToCore(
     systemMonitorTask,    // Task function
     "SystemMonitor",      // Task name
@@ -833,6 +877,5 @@ void setup() {
 }
 
 void loop() {
-  // Main loop is kept minimal to prevent blocking
   vTaskDelay(pdMS_TO_TICKS(1000));
 }
