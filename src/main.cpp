@@ -16,6 +16,8 @@ SystemStatus systemStatus;
 unsigned long lastMonitorTime = 0;
 unsigned long lastWebSocketTime = 0;
 unsigned long bootTime = 0;
+unsigned long lastAdminActivity = 0;
+const unsigned long ADMIN_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 // LoRa E32 instance
 LoRa_E32 e32ttl100(&Serial1, E32_AUX_PIN, E32_M0_PIN, E32_M1_PIN);
@@ -45,6 +47,14 @@ void clearTerminal();
 void controlOutput(int pin, bool state);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void printParameters(struct Configuration configuration);
+//dashboard functions
+void saveCounterConfig();
+void loadCounterConfig();
+void saveAdminCredentials();
+void loadAdminCredentials();
+void sendCounterStatus();
+void updateCounterStatus();
+void checkAdminTimeout();
 
 // Initialize input pins
 void initInputs() {
@@ -94,6 +104,10 @@ void initLittleFS() {
     return;
   }
   Serial.println("LittleFS mounted successfully");
+  loadIOConfig();
+  loadLoRaConfig();
+  loadCounterConfig();
+  loadAdminCredentials();
 }
 
 // Initialize LoRa E32
@@ -110,19 +124,18 @@ void initLoRaE32() {
   // Khởi tạo LoRa E32
   e32ttl100.begin();
   
-  // Load saved configuration if available
-  loadLoRaConfig();
-  
   // Đặt chế độ mặc định là Normal Mode
-  setLoRaOperatingMode(systemStatus.loraE32.operatingMode);
+  setLoRaOperatingMode(0); // Normal mode
+  
+  delay(1000); // Tăng delay để module ổn định
   
   Serial.println("Reading module information...");
   
-  // Đọc thông tin module
+  // Đọc thông tin module với error handling
   ResponseStructContainer c;
   c = e32ttl100.getModuleInformation();
   
-  if (c.status.code == 1) {
+  if (c.status.code == 1 && c.data != nullptr) {
     ModuleInformation mi = *(ModuleInformation*)c.data;
     printModuleInformation(mi);
     
@@ -138,55 +151,66 @@ void initLoRaE32() {
     Serial.print("Error reading module information: ");
     Serial.println(c.status.getResponseDescription());
     sendDebugMessage("Error reading LoRa E32 module information: " + String(c.status.getResponseDescription()));
-  }
-  c.close();
-  
-  delay(500);
-  
-  Serial.println("Reading current configuration...");
-  
-  // Đọc cấu hình hiện tại
-  ResponseStructContainer configContainer;
-  configContainer = e32ttl100.getConfiguration();
-  
-  if (configContainer.status.code == 1) {
-    Configuration configuration = *(Configuration*)configContainer.data;
-    Serial.println("Configuration read successfully!");
-    
-    printParameters(configuration);
-    
-    // Lưu cấu hình vào system status
-    systemStatus.loraE32.addh = configuration.ADDH;
-    systemStatus.loraE32.addl = configuration.ADDL;
-    systemStatus.loraE32.chan = configuration.CHAN;
-    systemStatus.loraE32.uartParity = configuration.SPED.uartParity;
-    systemStatus.loraE32.uartBaudRate = configuration.SPED.uartBaudRate;
-    systemStatus.loraE32.airDataRate = configuration.SPED.airDataRate;
-    systemStatus.loraE32.fixedTransmission = configuration.OPTION.fixedTransmission;
-    systemStatus.loraE32.ioDriveMode = configuration.OPTION.ioDriveMode;
-    systemStatus.loraE32.wirelessWakeupTime = configuration.OPTION.wirelessWakeupTime;
-    systemStatus.loraE32.fec = configuration.OPTION.fec;
-    systemStatus.loraE32.transmissionPower = configuration.OPTION.transmissionPower;
-    systemStatus.loraE32.frequency = configuration.getChannelDescription();
-    systemStatus.loraE32.parityBit = configuration.SPED.getUARTParityDescription();
-    systemStatus.loraE32.airDataRateStr = configuration.SPED.getAirDataRate();
-    systemStatus.loraE32.uartBaudRateStr = configuration.SPED.getUARTBaudRate();
-    systemStatus.loraE32.fixedTransmissionStr = configuration.OPTION.getFixedTransmissionDescription();
-    systemStatus.loraE32.ioDriveModeStr = configuration.OPTION.getIODroveModeDescription();
-    systemStatus.loraE32.wirelessWakeupTimeStr = configuration.OPTION.getWirelessWakeUPTimeDescription();
-    systemStatus.loraE32.fecStr = configuration.OPTION.getFECDescription();
-    systemStatus.loraE32.transmissionPowerStr = configuration.OPTION.getTransmissionPowerDescription();
-    
-    sendDebugMessage("LoRa E32 configuration read successfully");
-  } else {
-    Serial.print("Error reading configuration: ");
-    Serial.println(configContainer.status.getResponseDescription());
-    sendDebugMessage("Error reading LoRa E32 configuration: " + String(configContainer.status.getResponseDescription()));
+    systemStatus.loraE32.initialized = false;
   }
   
-  configContainer.close();
+  if (c.data != nullptr) {
+    c.close();
+  }
+  
+  delay(1000);
+  
+  // Chỉ đọc configuration nếu module đã được khởi tạo thành công
+  if (systemStatus.loraE32.initialized) {
+    Serial.println("Reading current configuration...");
+    
+    // Đọc cấu hình hiện tại
+    ResponseStructContainer configContainer;
+    configContainer = e32ttl100.getConfiguration();
+    
+    if (configContainer.status.code == 1 && configContainer.data != nullptr) {
+      Configuration configuration = *(Configuration*)configContainer.data;
+      Serial.println("Configuration read successfully!");
+      
+      printParameters(configuration);
+      
+      // Lưu cấu hình vào system status
+      systemStatus.loraE32.addh = configuration.ADDH;
+      systemStatus.loraE32.addl = configuration.ADDL;
+      systemStatus.loraE32.chan = configuration.CHAN;
+      systemStatus.loraE32.uartParity = configuration.SPED.uartParity;
+      systemStatus.loraE32.uartBaudRate = configuration.SPED.uartBaudRate;
+      systemStatus.loraE32.airDataRate = configuration.SPED.airDataRate;
+      systemStatus.loraE32.fixedTransmission = configuration.OPTION.fixedTransmission;
+      systemStatus.loraE32.ioDriveMode = configuration.OPTION.ioDriveMode;
+      systemStatus.loraE32.wirelessWakeupTime = configuration.OPTION.wirelessWakeupTime;
+      systemStatus.loraE32.fec = configuration.OPTION.fec;
+      systemStatus.loraE32.transmissionPower = configuration.OPTION.transmissionPower;
+      systemStatus.loraE32.frequency = configuration.getChannelDescription();
+      systemStatus.loraE32.parityBit = configuration.SPED.getUARTParityDescription();
+      systemStatus.loraE32.airDataRateStr = configuration.SPED.getAirDataRate();
+      systemStatus.loraE32.uartBaudRateStr = configuration.SPED.getUARTBaudRate();
+      systemStatus.loraE32.fixedTransmissionStr = configuration.OPTION.getFixedTransmissionDescription();
+      systemStatus.loraE32.ioDriveModeStr = configuration.OPTION.getIODroveModeDescription();
+      systemStatus.loraE32.wirelessWakeupTimeStr = configuration.OPTION.getWirelessWakeUPTimeDescription();
+      systemStatus.loraE32.fecStr = configuration.OPTION.getFECDescription();
+      systemStatus.loraE32.transmissionPowerStr = configuration.OPTION.getTransmissionPowerDescription();
+      
+      sendDebugMessage("LoRa E32 configuration read successfully");
+    } else {
+      Serial.print("Error reading configuration: ");
+      Serial.println(configContainer.status.getResponseDescription());
+      sendDebugMessage("Error reading LoRa E32 configuration: " + String(configContainer.status.getResponseDescription()));
+    }
+    
+    if (configContainer.data != nullptr) {
+      configContainer.close();
+    }
+  }
+  
   Serial.println("=== LoRa E32 Initialization Complete ===");
 }
+
 
 // Save LoRa configuration to JSON
 void saveLoRaConfig() {
@@ -265,12 +289,17 @@ void loadLoRaConfig() {
 
 // Set LoRa E32 configuration
 void setLoRaConfig(LoRaE32Config config) {
+  if (!systemStatus.loraE32.initialized) {
+    sendDebugMessage("LoRa E32 not initialized, cannot set configuration");
+    return;
+  }
+  
   // Lưu chế độ hoạt động hiện tại
   uint8_t previousMode = systemStatus.loraE32.operatingMode;
 
   // Chuyển module về chế độ Sleep để cấu hình
   setLoRaOperatingMode(3); // MODE_3_PROGRAM
-  delay(100);
+  delay(500); // Tăng delay
 
   Configuration loraConfig;
   loraConfig.HEAD = 0xC0; // For WRITE_CFG_PWR_DWN_SAVE
@@ -316,9 +345,11 @@ void setLoRaConfig(LoRaE32Config config) {
     // Lưu cấu hình vào LittleFS
     saveLoRaConfig();
     
+    delay(500);
+    
     // Đọc lại cấu hình để cập nhật trạng thái
     ResponseStructContainer configContainer = e32ttl100.getConfiguration();
-    if (configContainer.status.code == 1) {
+    if (configContainer.status.code == 1 && configContainer.data != nullptr) {
       Configuration newConfig = *(Configuration*)configContainer.data;
       printParameters(newConfig);
       systemStatus.loraE32.frequency = newConfig.getChannelDescription();
@@ -330,11 +361,14 @@ void setLoRaConfig(LoRaE32Config config) {
       systemStatus.loraE32.wirelessWakeupTimeStr = newConfig.OPTION.getWirelessWakeUPTimeDescription();
       systemStatus.loraE32.fecStr = newConfig.OPTION.getFECDescription();
       systemStatus.loraE32.transmissionPowerStr = newConfig.OPTION.getTransmissionPowerDescription();
-      configContainer.close();
     } else {
       Serial.print("Error reading configuration: ");
       Serial.println(configContainer.status.getResponseDescription());
       sendDebugMessage("Error reading LoRa E32 configuration: " + String(configContainer.status.getResponseDescription()));
+    }
+    
+    if (configContainer.data != nullptr) {
+      configContainer.close();
     }
   } else {
     Serial.print("Error setting configuration: ");
@@ -344,8 +378,9 @@ void setLoRaConfig(LoRaE32Config config) {
 
   // Khôi phục chế độ hoạt động trước đó
   setLoRaOperatingMode(previousMode);
-  delay(100);
+  delay(500);
 }
+
 
 // Set LoRa operating mode
 void setLoRaOperatingMode(uint8_t mode) {
@@ -552,7 +587,187 @@ void loadIOConfig() {
     }
   }
 }
+// Save counter configuration to JSON
+void saveCounterConfig() {
+  JSONVar config;
+  config["planDisplay"] = systemStatus.planDisplay;
+  JSONVar countersArray;
+  for (int i = 0; i < 4; i++) {
+    JSONVar counterObj;
+    counterObj["pin"] = systemStatus.counters[i].pin;
+    counterObj["delayFilter"] = systemStatus.counters[i].delayFilter;
+    counterObj["count"] = systemStatus.counters[i].count;
+    countersArray[i] = counterObj;
+  }
+  config["counters"] = countersArray;
 
+  String jsonString = JSON.stringify(config);
+  
+  File file = LittleFS.open("/counter_config.json", "w");
+  if (file) {
+    file.print(jsonString);
+    file.close();
+    Serial.println("Counter configuration saved");
+    sendDebugMessage("Counter configuration saved to LittleFS");
+  } else {
+    Serial.println("Failed to save counter configuration");
+    sendDebugMessage("Failed to save counter configuration");
+  }
+}
+// Load counter configuration from JSON
+void loadCounterConfig() {
+  if (LittleFS.exists("/counter_config.json")) {
+    File file = LittleFS.open("/counter_config.json", "r");
+    if (file) {
+      String jsonString = file.readString();
+      file.close();
+      
+      JSONVar config = JSON.parse(jsonString);
+      
+      if (JSON.typeof(config) == "undefined") {
+        Serial.println("Failed to parse counter configuration");
+        sendDebugMessage("Failed to parse counter configuration");
+        return;
+      }
+      
+      systemStatus.planDisplay = (int)config["planDisplay"];
+      JSONVar countersArray = config["counters"];
+      for (int i = 0; i < 4; i++) {
+        if (countersArray.hasOwnProperty(String(i))) {
+          JSONVar counterObj = countersArray[i];
+          systemStatus.counters[i].pin = (int)counterObj["pin"];
+          systemStatus.counters[i].delayFilter = (int)counterObj["delayFilter"];
+          systemStatus.counters[i].count = (int)counterObj["count"];
+          systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
+          systemStatus.counters[i].lastDebounceTime = 0;
+        }
+      }
+      
+      Serial.println("Counter configuration loaded");
+      sendDebugMessage("Counter configuration loaded from LittleFS");
+    }
+  } else {
+    // Default configuration
+    systemStatus.counters[0].pin = 5;
+    systemStatus.counters[1].pin = 6;
+    systemStatus.counters[2].pin = 7;
+    systemStatus.counters[3].pin = 37;
+    for (int i = 0; i < 4; i++) {
+      systemStatus.counters[i].delayFilter = 50;
+      systemStatus.counters[i].count = 0;
+      systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
+      systemStatus.counters[i].lastDebounceTime = 0;
+    }
+    saveCounterConfig();
+  }
+}
+
+// Save admin credentials to JSON
+void saveAdminCredentials() {
+  JSONVar config;
+  config["username"] = systemStatus.adminCredentials.username;
+  config["password"] = systemStatus.adminCredentials.password; // Should be hashed in production
+
+  String jsonString = JSON.stringify(config);
+  
+  File file = LittleFS.open("/admin_credentials.json", "w");
+  if (file) {
+    file.print(jsonString);
+    file.close();
+    Serial.println("Admin credentials saved");
+    sendDebugMessage("Admin credentials saved to LittleFS");
+  } else {
+    Serial.println("Failed to save admin credentials");
+    sendDebugMessage("Failed to save admin credentials");
+  }
+}
+// Load admin credentials from JSON
+void loadAdminCredentials() {
+  if (LittleFS.exists("/admin_credentials.json")) {
+    File file = LittleFS.open("/admin_credentials.json", "r");
+    if (file) {
+      String jsonString = file.readString();
+      file.close();
+      
+      JSONVar config = JSON.parse(jsonString);
+      
+      if (JSON.typeof(config) == "undefined") {
+        Serial.println("Failed to parse admin credentials");
+        sendDebugMessage("Failed to parse admin credentials");
+        return;
+      }
+      
+      systemStatus.adminCredentials.username = (const char*)config["username"];
+      systemStatus.adminCredentials.password = (const char*)config["password"];
+      
+      Serial.println("Admin credentials loaded");
+      sendDebugMessage("Admin credentials loaded from LittleFS");
+    }
+  } else {
+    saveAdminCredentials();
+  }
+}
+// Send counter status via WebSocket
+void sendCounterStatus() {
+  if (ws.count() > 0) {
+    JSONVar response;
+    response["action"] = "counter_status";
+    response["planDisplay"] = systemStatus.planDisplay;
+    JSONVar countersArray;
+    for (int i = 0; i < 4; i++) {
+      JSONVar counterObj;
+      counterObj["pin"] = systemStatus.counters[i].pin;
+      counterObj["delayFilter"] = systemStatus.counters[i].delayFilter;
+      counterObj["count"] = systemStatus.counters[i].count;
+      countersArray[i] = counterObj;
+    }
+    response["counters"] = countersArray;
+
+    String jsonString = JSON.stringify(response);
+    ws.textAll(jsonString);
+
+    if (DEBUG_MODE) {
+      Serial.println("Counter status sent to WebSocket");
+    }
+  }
+}
+
+// Update counter status with debounce
+void updateCounterStatus() {
+  unsigned long currentTime = millis();
+  bool statusChanged = false;
+
+  for (int i = 0; i < 4; i++) {
+    bool currentState = digitalRead(systemStatus.counters[i].pin);
+    
+    if (currentState != systemStatus.counters[i].lastState) {
+      systemStatus.counters[i].lastDebounceTime = currentTime;
+    }
+
+    if ((currentTime - systemStatus.counters[i].lastDebounceTime) > systemStatus.counters[i].delayFilter) {
+      if (currentState != systemStatus.counters[i].lastState && currentState == LOW) { // Falling edge
+        systemStatus.counters[i].count++;
+        statusChanged = true;
+        String message = String("Counter ") + (i+1) + " (Pin " + systemStatus.counters[i].pin + ") incremented to " + systemStatus.counters[i].count;
+        sendDebugMessage(message);
+      }
+      systemStatus.counters[i].lastState = currentState;
+    }
+  }
+
+  if (statusChanged) {
+    saveCounterConfig();
+    sendCounterStatus();
+  }
+}
+
+// Check admin session timeout
+void checkAdminTimeout() {
+  if (systemStatus.adminMode && (millis() - lastAdminActivity) > ADMIN_TIMEOUT) {
+    systemStatus.adminMode = false;
+    sendDebugMessage("Admin session timed out");
+  }
+}
 // Control output pin
 void controlOutput(int pin, bool state) {
   digitalWrite(pin, state ? HIGH : LOW);
@@ -669,8 +884,9 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       bool state = (bool)json["state"];
       controlOutput(pin, state);
     }
-    else if (action == "get_lora_e32_config") {
+    else if (action == "get_lora_e32_config" || action == "get_counter_config") {
       sendSystemStatus();
+      sendCounterStatus();
     }
     else if (action == "refresh_lora_e32") {
       initLoRaE32();
@@ -689,7 +905,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       config.wirelessWakeupTime = (int)json["wirelessWakeupTime"];
       config.fec = (int)json["fec"];
       config.transmissionPower = (int)json["transmissionPower"];
-      config.operatingMode = systemStatus.loraE32.operatingMode; // Giữ nguyên chế độ hiện tại
+      config.operatingMode = systemStatus.loraE32.operatingMode;
       
       setLoRaConfig(config);
       sendSystemStatus();
@@ -698,6 +914,48 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       uint8_t mode = (int)json["mode"];
       setLoRaOperatingMode(mode);
       sendSystemStatus();
+    }
+    else if (action == "set_counter_config") {
+      systemStatus.planDisplay = (int)json["planDisplay"];
+      JSONVar countersArray = json["counters"];
+      for (int i = 0; i < 4; i++) {
+        systemStatus.counters[i].pin = (int)countersArray[i]["pin"];
+        systemStatus.counters[i].delayFilter = (int)countersArray[i]["delayFilter"];
+        systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
+        systemStatus.counters[i].lastDebounceTime = 0;
+      }
+      saveCounterConfig();
+      sendCounterStatus();
+    }
+    else if (action == "admin_login") {
+      String username = JSON.stringify(json["username"]);
+      String password = JSON.stringify(json["password"]);
+      username.replace("\"", "");
+      password.replace("\"", "");
+      
+      JSONVar response;
+      response["action"] = "login_result";
+      if (username == systemStatus.adminCredentials.username && password == systemStatus.adminCredentials.password) {
+        systemStatus.adminMode = true;
+        lastAdminActivity = millis();
+        response["success"] = true;
+        sendDebugMessage("Admin login successful");
+      } else {
+        response["success"] = false;
+        sendDebugMessage("Admin login failed");
+      }
+      ws.textAll(JSON.stringify(response));
+    }
+    else if (action == "change_admin_credentials" && systemStatus.adminMode) {
+      String newUsername = JSON.stringify(json["username"]);
+      String newPassword = JSON.stringify(json["password"]);
+      newUsername.replace("\"", "");
+      newPassword.replace("\"", "");
+      
+      systemStatus.adminCredentials.username = newUsername;
+      systemStatus.adminCredentials.password = newPassword;
+      saveAdminCredentials();
+      sendDebugMessage("Admin credentials updated");
     }
   }
 }
@@ -726,7 +984,14 @@ void initWebSocket() {
   ws.onEvent(onWebSocketEvent);
   server.addHandler(&ws);
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/index.html", "text/html");
+    request->send(LittleFS, "/dashboard.html", "text/html");
+  });
+  server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (systemStatus.adminMode) {
+      request->send(LittleFS, "/index.html", "text/html");
+    } else {
+      request->send(403, "text/plain", "Access denied. Please login as admin.");
+    }
   });
   server.serveStatic("/", LittleFS, "/");
   server.begin();
@@ -764,6 +1029,8 @@ void updateSystemStatus() {
     }
   }
 
+  updateCounterStatus(); // Update counter status
+
   size_t newFreeHeap = ESP.getFreeHeap();
   size_t newFreePsram = ESP.getFreePsram();
   
@@ -785,6 +1052,8 @@ void updateSystemStatus() {
 
   systemStatus.uptime = millis() - bootTime;
 
+  checkAdminTimeout();
+
   // Send system status message
   String statusMessage = "=== System Status ===\n";
   statusMessage += String("Reset Count: ") + systemStatus.resetCount + "\n";
@@ -796,6 +1065,10 @@ void updateSystemStatus() {
   for (int i = 0; i < NUM_OUTPUTS; i++) {
     statusMessage += String("Pin ") + systemStatus.outputs[i].pin + ": " + systemStatus.outputs[i].stateStr + " ";
   }
+  statusMessage += "\nCounters: ";
+  for (int i = 0; i < 4; i++) {
+    statusMessage += String("Pin ") + systemStatus.counters[i].pin + ": " + systemStatus.counters[i].count + " ";
+  }
   statusMessage += String("\nFree Heap: ") + systemStatus.freeHeap + " bytes\n";
   statusMessage += String("Free PSRAM: ") + systemStatus.freePsram + " bytes\n";
   statusMessage += String("Temperature: ") + String(systemStatus.temperature, 2) + " °C\n";
@@ -805,6 +1078,7 @@ void updateSystemStatus() {
   statusMessage += String("LoRa E32 Operating Mode: ") + (systemStatus.loraE32.operatingMode == 0 ? "Normal" : 
                                                            systemStatus.loraE32.operatingMode == 1 ? "Wake-Up" : 
                                                            systemStatus.loraE32.operatingMode == 2 ? "Power-Saving" : "Sleep") + "\n";
+  statusMessage += String("Admin Mode: ") + (systemStatus.adminMode ? "Active" : "Inactive") + "\n";
   statusMessage += "====================";
   sendDebugMessage(statusMessage);
 
@@ -844,7 +1118,6 @@ void setup() {
   initOutputs();
   initWiFi();
   initLittleFS();
-  loadIOConfig();
   initLoRaE32();
   initWebSocket();
   sendDebugMessage("WebSocket server started");
@@ -853,23 +1126,23 @@ void setup() {
   systemStatus.ipAddress = WiFi.localIP().toString();
 
   xTaskCreatePinnedToCore(
-    systemMonitorTask,    // Task function
-    "SystemMonitor",      // Task name
-    4096,                 // Stack size
-    NULL,                 // Task parameters
-    2,                    // Priority
-    NULL,                 // Task handle
-    1                     // Core ID
+    systemMonitorTask,
+    "SystemMonitor",
+    4096,
+    NULL,
+    2,
+    NULL,
+    1
   );
 
   xTaskCreatePinnedToCore(
-    webSocketTask,        // Task function
-    "WebSocketTask",      // Task name
-    4096,                 // Stack size
-    NULL,                 // Task parameters
-    1,                    // Priority
-    NULL,                 // Task handle
-    1                     // Core ID
+    webSocketTask,
+    "WebSocketTask",
+    4096,
+    NULL,
+    1,
+    NULL,
+    1
   );
 
   sendDebugMessage("System initialization complete!");

@@ -1,0 +1,73 @@
+/* styles.css */
+
+/* Terminal styling */
+#terminal {
+  height: 200px;
+  overflow-y: auto;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  font-family: monospace;
+  padding: 10px;
+}
+
+/* Input status styling */
+.input-status {
+  background-color: #e0e0e0;
+  padding: 5px;
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+/* Output button styling */
+.output-btn {
+  transition: background-color 0.3s;
+}
+
+.output-btn.on {
+  background-color: #10b981; /* Green */
+}
+
+.output-btn.off {
+  background-color: #ef4444; /* Red */
+}
+
+/* LoRa information styling */
+.lora-info {
+  background-color: #f3f4f6;
+  padding: 10px;
+  border-radius: 6px;
+  margin: 5px 0;
+}
+
+.lora-info-label {
+  font-weight: bold;
+  color: #374151;
+}
+
+.lora-info-value {
+  color: #1f2937;
+}
+
+/* Form elements styling */
+select, input[type="number"], input[type="text"], input[type="password"] {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 5px;
+  width: 100%;
+}
+
+/* Configuration section visibility */
+.config-section {
+  display: none;
+}
+
+.config-section.active {
+  display: block;
+}
+
+/* Change password section styling */
+#change-password {
+  background-color: #f3f4f6;
+  padding: 20px;
+  border-radius: 6px;
+}

@@ -4,6 +4,11 @@
 #include <Arduino.h>
 
 // WiFi Configuration
+// const char* WIFI_SSID = "I-Soft";
+// const char* WIFI_PASSWORD = "i-soft@2023";
+// const char* WIFI_SSID = "Galaxy M12 A5AB";
+// const char* WIFI_PASSWORD = "88888888";
+
 const char* WIFI_SSID = "Heo vang 2019";
 const char* WIFI_PASSWORD = "Hungthinh210315";
 
@@ -22,19 +27,19 @@ const int NUM_OUTPUTS = 5;
 // LoRa E32 Configuration Pins
 #define E32_M0_PIN    15
 #define E32_M1_PIN    16
-#define E32_TX_PIN    17  // TX của ESP32 → RX của E32
-#define E32_RX_PIN    18  // RX của ESP32 → TX của E32
-#define E32_AUX_PIN   -1  // Không sử dụng AUX
+#define E32_TX_PIN    17
+#define E32_RX_PIN    18
+#define E32_AUX_PIN   -1
 
 // System Monitor Configuration
-const unsigned long MONITOR_INTERVAL = 2000; // 2 seconds
-const unsigned long WEBSOCKET_UPDATE_INTERVAL = 5000; // 5 seconds
+const unsigned long MONITOR_INTERVAL = 2000;
+const unsigned long WEBSOCKET_UPDATE_INTERVAL = 5000;
 
 // Temperature sensor configuration
-const float TEMP_OFFSET = -5.0; // Offset for temperature calibration
+const float TEMP_OFFSET = -5.0;
 
 // Input pin modes
-const int INPUT_MODE = INPUT_PULLUP; // Use internal pullup resistors
+const int INPUT_MODE = INPUT_PULLUP;
 
 // Debug configuration
 const bool DEBUG_MODE = true;
@@ -42,6 +47,21 @@ const int SERIAL_BAUD_RATE = 115200;
 
 // Reset counter storage in RTC memory
 RTC_DATA_ATTR int reset_counter = 0;
+
+// Counter configuration
+struct CounterConfig {
+  int pin;
+  unsigned long delayFilter; // Delay filter in milliseconds
+  unsigned long count;
+  bool lastState;
+  unsigned long lastDebounceTime;
+};
+
+// Admin credentials
+struct AdminCredentials {
+  String username = "admin";
+  String password = "admin123";
+};
 
 // Structure for input status
 struct InputStatus {
@@ -74,15 +94,15 @@ struct LoRaE32Config {
   String fecStr = "";
   String fixedTransmissionStr = "";
   String ioDriveModeStr = "";
-  uint8_t uartParity = 0;         // 0b00: 8N1, 0b01: 8O1, 0b10: 8E1
-  uint8_t uartBaudRate = 0b011;  // e.g., 0b011 for 9600
-  uint8_t airDataRate = 0b010;   // e.g., 0b010 for 2.4kbps
-  uint8_t fixedTransmission = 0; // 0: Transparent, 1: Fixed
-  uint8_t ioDriveMode = 1;       // 0: Open-collector, 1: Push-pull
-  uint8_t wirelessWakeupTime = 0;// 0b000: 250ms, etc.
-  uint8_t fec = 1;               // 0: Off, 1: On
-  uint8_t transmissionPower = 0b11; // e.g., 0b11 for 20dBm
-  uint8_t operatingMode = 0;     // 0: Normal, 1: Wake-Up, 2: Power-Saving, 3: Sleep
+  uint8_t uartParity = 0;
+  uint8_t uartBaudRate = 0b011;
+  uint8_t airDataRate = 0b010;
+  uint8_t fixedTransmission = 0;
+  uint8_t ioDriveMode = 1;
+  uint8_t wirelessWakeupTime = 0;
+  uint8_t fec = 1;
+  uint8_t transmissionPower = 0b11;
+  uint8_t operatingMode = 0;
 };
 
 // Structure for system status
@@ -96,6 +116,10 @@ struct SystemStatus {
   String ipAddress;
   unsigned long uptime;
   LoRaE32Config loraE32;
+  int planDisplay = 0;
+  CounterConfig counters[4];
+  bool adminMode = false;
+  AdminCredentials adminCredentials;
 };
 
 // Function declarations
@@ -103,5 +127,9 @@ void saveLoRaConfig();
 void loadLoRaConfig();
 void setLoRaConfig(LoRaE32Config config);
 void setLoRaOperatingMode(uint8_t mode);
+void saveCounterConfig();
+void loadCounterConfig();
+void saveAdminCredentials();
+void loadAdminCredentials();
 
 #endif

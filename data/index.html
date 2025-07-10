@@ -3,68 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32-S3 Dashboard</title>
+  <title>ESP32-S3 Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    #terminal {
-      height: 200px;
-      overflow-y: auto;
-      background-color: #1a1a1a;
-      color: #ffffff;
-      font-family: monospace;
-      padding: 10px;
-    }
-    .input-status {
-      background-color: #e0e0e0;
-      padding: 5px;
-      border-radius: 4px;
-      margin: 2px 0;
-    }
-    .output-btn {
-      transition: background-color 0.3s;
-    }
-    .output-btn.on {
-      background-color: #10b981; /* Xanh lá */
-    }
-    .output-btn.off {
-      background-color: #ef4444; /* Đỏ */
-    }
-    .lora-info {
-      background-color: #f3f4f6;
-      padding: 10px;
-      border-radius: 6px;
-      margin: 5px 0;
-    }
-    .lora-info-label {
-      font-weight: bold;
-      color: #374151;
-    }
-    .lora-info-value {
-      color: #1f2937;
-    }
-    select, input[type="number"] {
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 5px;
-      width: 100%;
-    }
-    .config-section {
-      display: none;
-    }
-    .config-section.active {
-      display: block;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-gray-100 font-sans">
   <div class="container mx-auto p-4">
     <!-- Header -->
     <div id="dashboard" class="mb-6">
-      <h1 class="text-2xl font-bold mb-4">ESP32-S3 Dashboard</h1>
+      <h1 class="text-2xl font-bold mb-4">ESP32-S3 Admin Dashboard</h1>
       <p id="connection-status" class="mb-4 text-lg">WebSocket: Disconnected</p>
       <div class="flex space-x-4">
         <button onclick="showPage('console')" class="bg-blue-500 text-white px-4 py-2 rounded">Console</button>
         <button onclick="showPage('lora')" class="bg-blue-500 text-white px-4 py-2 rounded">LoRa E32 Info</button>
+        <button onclick="showPage('change-password')" class="bg-purple-500 text-white px-4 py-2 rounded">Change Password</button>
       </div>
     </div>
 
@@ -101,6 +53,7 @@
 
     <!-- LoRa E32 Info Page -->
     <div id="lora" class="hidden">
+      <!-- ... (Giữ nguyên nội dung hiện tại của phần LoRa) ... -->
       <h2 class="text-xl font-bold mb-4">LoRa E32 Information</h2>
       
       <!-- Module Status -->
@@ -163,6 +116,7 @@
               <option value="0">0.3kbps</option>
               <option value="1">1.2kbps</option>
               <option value="2" selected>2.4kbps</option>
+              VD
               <option value="3">4.8kbps</option>
               <option value="4">9.6kbps</option>
               <option value="5">19.2kbps</option>
@@ -257,205 +211,31 @@
         <button onclick="setLoRaOperatingMode()" class="bg-yellow-500 text-white px-4 py-2 rounded">Set Operating Mode</button>
       </div>
     </div>
+
+    <!-- Change Password Page -->
+    <div id="change-password" class="hidden mt-6">
+      <h2 class="text-xl font-bold mb-4">Change Admin Credentials</h2>
+      <p id="credential-error" class="text-red-500 hidden">Please fill in both fields</p>
+      <p id="credential-success" class="text-green-500 hidden">Credentials updated successfully</p>
+      <div class="mb-4">
+        <label class="block font-semibold">New Username:</label>
+        <input type="text" id="new-username" class="border p-2 rounded w-full" placeholder="Enter new username">
+      </div>
+      <div class="mb-4">
+        <label class="block font-semibold">New Password:</label>
+        <input type="password" id="new-password" class="border p-2 rounded w-full" placeholder="Enter new password">
+      </div>
+      <div class="mb-4">
+        <label class="block font-semibold">Confirm Password:</label>
+        <input type="password" id="confirm-password" class="border p-2 rounded w-full" placeholder="Confirm new password">
+      </div>
+      <div class="flex space-x-4">
+        <button onclick="showPage('dashboard')" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+        <button onclick="changeCredentials()" class="bg-purple-500 text-white px-4 py-2 rounded">Update Credentials</button>
+      </div>
+    </div>
   </div>
 
-  <script>
-    let ws = null;
-    const terminal = document.getElementById('terminal');
-
-    function showPage(pageId) {
-      document.getElementById('dashboard').classList.add('hidden');
-      document.getElementById('console').classList.add('hidden');
-      document.getElementById('lora').classList.add('hidden');
-      document.getElementById(pageId).classList.remove('hidden');
-      if (pageId === 'lora') {
-        updateConfigVisibility();
-      }
-    }
-
-    function appendTerminal(message) {
-      const formattedMessage = message.replace(/\n/g, '<br>');
-      terminal.innerHTML += formattedMessage + '<br>';
-      terminal.scrollTop = terminal.scrollHeight;
-      if (terminal.childElementCount > 100) {
-        terminal.removeChild(terminal.firstChild);
-      }
-    }
-
-    function updateConfigVisibility() {
-      const operatingMode = document.getElementById('lora-operating-mode').value;
-      const configSections = ['address-config', 'rf-config', 'uart-config', 'options-config', 'set-config-btn'];
-      if (operatingMode === '3') { // Sleep Mode
-        configSections.forEach(section => {
-          document.getElementById(section).classList.add('active');
-        });
-      } else {
-        configSections.forEach(section => {
-          document.getElementById(section).classList.remove('active');
-        });
-      }
-    }
-
-    function toggleOutput(pin) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const button = document.getElementById(`output-btn-${pin}`);
-        const state = button.classList.contains('on');
-        button.classList.toggle('on', !state);
-        button.classList.toggle('off', state);
-        button.textContent = state ? 'OFF' : 'ON';
-        ws.send(JSON.stringify({
-          action: 'control_output',
-          pin: pin,
-          state: !state
-        }));
-      }
-    }
-
-    function refreshLoRaE32() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          action: 'refresh_lora_e32'
-        }));
-        appendTerminal('Refreshing LoRa E32 configuration...');
-      }
-    }
-
-    function getLoRaE32Config() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          action: 'get_lora_e32_config'
-        }));
-        appendTerminal('Getting LoRa E32 configuration...');
-      }
-    }
-
-    function setLoRaE32Config() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const config = {
-          action: 'set_lora_e32_config',
-          addh: parseInt(document.getElementById('lora-addh').value),
-          addl: parseInt(document.getElementById('lora-addl').value),
-          chan: parseInt(document.getElementById('lora-chan').value),
-          uartParity: parseInt(document.getElementById('lora-parity-bit').value),
-          uartBaudRate: parseInt(document.getElementById('lora-uart-baud-rate').value),
-          airDataRate: parseInt(document.getElementById('lora-air-data-rate').value),
-          fixedTransmission: parseInt(document.getElementById('lora-fixed-transmission').value),
-          ioDriveMode: parseInt(document.getElementById('lora-io-drive-mode').value),
-          wirelessWakeupTime: parseInt(document.getElementById('lora-wireless-wakeup-time').value),
-          fec: parseInt(document.getElementById('lora-fec').value),
-          transmissionPower: parseInt(document.getElementById('lora-transmission-power').value)
-        };
-        ws.send(JSON.stringify(config));
-        appendTerminal('Setting LoRa E32 configuration (switching to Sleep Mode temporarily)...');
-      }
-    }
-
-    function setLoRaOperatingMode() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const mode = parseInt(document.getElementById('lora-operating-mode').value);
-        ws.send(JSON.stringify({
-          action: 'set_lora_operating_mode',
-          mode: mode
-        }));
-        appendTerminal(`Setting LoRa E32 operating mode to ${['Normal', 'Wake-Up', 'Power-Saving', 'Sleep'][mode]}...`);
-        updateConfigVisibility();
-      }
-    }
-
-    function updateStatus(data) {
-      console.log('WebSocket data received:', data);
-
-      if (data.action === 'system_status') {
-        document.getElementById('reset-count').textContent = data.reset_count;
-        document.getElementById('free-heap').textContent = data.free_heap;
-        document.getElementById('free-psram').textContent = data.free_psram;
-        document.getElementById('temperature').textContent = data.temperature.toFixed(2);
-        document.getElementById('ip-address').textContent = data.ip_address;
-        document.getElementById('uptime').textContent = data.uptime;
-
-        // Update Input Status
-        const inputStatus = document.getElementById('input-status');
-        inputStatus.innerHTML = '';
-        data.inputs.forEach(input => {
-          inputStatus.innerHTML += `
-            <div class="input-status">
-              Pin ${input.pin}: ${input.state}
-            </div>`;
-          if (document.getElementById(`input-${input.pin}`)?.dataset.state !== input.state) {
-            appendTerminal(`Pin ${input.pin} changed to ${input.state}`);
-          }
-          if (document.getElementById(`input-${input.pin}`)) {
-            document.getElementById(`input-${input.pin}`).dataset.state = input.state;
-          }
-        });
-
-        // Update Output Controls
-        const outputControls = document.getElementById('output-controls');
-        outputControls.innerHTML = '';
-        data.outputs.forEach(output => {
-          outputControls.innerHTML += `
-            <button id="output-btn-${output.pin}" 
-                    class="output-btn px-4 py-2 rounded text-white ${output.state === 'HIGH' ? 'on' : 'off'}"
-                    onclick="toggleOutput(${output.pin})">
-              ${output.state === 'HIGH' ? 'ON' : 'OFF'}
-            </button>`;
-        });
-
-        // Update LoRa E32 Information
-        if (data.loraE32) {
-          document.getElementById('lora-initialized').textContent = data.loraE32.initialized ? 'YES' : 'NO';
-          document.getElementById('lora-module-info').textContent = data.loraE32.moduleInfo || 'Not available';
-          document.getElementById('lora-addh').value = data.loraE32.addh || 0;
-          document.getElementById('lora-addl').value = data.loraE32.addl || 0;
-          document.getElementById('lora-chan').value = data.loraE32.chan || 0;
-          document.getElementById('lora-frequency').textContent = data.loraE32.frequency || 'Not available';
-        //   console.log('LoRa E32 Frequency:', data.loraE32.frequency);
-          document.getElementById('lora-air-data-rate').value = data.loraE32.airDataRate ? parseInt(data.loraE32.airDataRate.replace('kbps', '')) : 2;
-        //   console.log('LoRa E32 Air Data Rate:', data.loraE32.airDataRate);
-          document.getElementById('lora-uart-baud-rate').value = data.loraE32.uartBaudRate ? parseInt(data.loraE32.uartBaudRate) : 3;
-          document.getElementById('lora-transmission-power').value = data.loraE32.transmissionPower ? parseInt(data.loraE32.transmissionPower.replace('dBm', '')) : 3;
-          document.getElementById('lora-parity-bit').value = data.loraE32.parityBit ? (data.loraE32.parityBit === '8N1' ? 0 : data.loraE32.parityBit === '8O1' ? 1 : 2) : 0;
-          document.getElementById('lora-wireless-wakeup-time').value = data.loraE32.wirelessWakeupTime ? parseInt(data.loraE32.wirelessWakeupTime.replace('ms', '')) / 250 : 0;
-          document.getElementById('lora-fec').value = data.loraE32.fec === 'On' ? 1 : 0;
-          document.getElementById('lora-fixed-transmission').value = data.loraE32.fixedTransmission === 'Transparent' ? 0 : 1;
-          document.getElementById('lora-io-drive-mode').value = data.loraE32.ioDriveMode === 'Push-pull' ? 1 : 0;
-          document.getElementById('lora-operating-mode').value = data.loraE32.operatingMode || 0;
-          updateConfigVisibility();
-        }
-      } else if (data.action === 'debug') {
-        appendTerminal(data.message);
-      }
-    }
-
-    function initWebSocket() {
-      ws = new WebSocket(`ws://192.168.0.117/ws`);
-
-      ws.onopen = () => {
-        document.getElementById('connection-status').textContent = 'WebSocket: Connected';
-        appendTerminal('WebSocket connected');
-        ws.send(JSON.stringify({ action: 'get_lora_e32_config' }));
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (!data.action) {
-            appendTerminal('Lỗi: Nhận được tin nhắn WebSocket không hợp lệ');
-            return;
-          }
-          updateStatus(data);
-        } catch (e) {
-          appendTerminal('Lỗi: Không thể phân tích tin nhắn WebSocket');
-        }
-      };
-      ws.onclose = () => {
-        document.getElementById('connection-status').textContent = 'WebSocket: Disconnected';
-        appendTerminal('WebSocket disconnected');
-        setTimeout(initWebSocket, 5000);
-      };
-    }
-
-    initWebSocket();
-    showPage('dashboard');
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
