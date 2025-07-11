@@ -48,6 +48,7 @@ void controlOutput(int pin, bool state);
 void printModuleInformation(struct ModuleInformation moduleInformation);
 void printParameters(struct Configuration configuration);
 //dashboard functions
+void initCounters();
 void saveCounterConfig();
 void loadCounterConfig();
 void saveAdminCredentials();
@@ -114,7 +115,7 @@ void initLittleFS() {
 void initLoRaE32() {
   Serial.println("=== Initializing LoRa E32 ===");
   
-  // Thiết lập chân M0, M1 là OUTPUT
+  // Initialize chân M0, M1 là OUTPUT
   pinMode(E32_M0_PIN, OUTPUT);
   pinMode(E32_M1_PIN, OUTPUT);
   
@@ -587,6 +588,26 @@ void loadIOConfig() {
     }
   }
 }
+// Initialize counter pins
+void initCounters() {
+  Serial.println("=== Initializing Counter Pins ===");
+  for (int i = 0; i < 4; i++) {
+    pinMode(systemStatus.counters[i].pin, INPUT_PULLUP);
+    systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
+    systemStatus.counters[i].stableState = systemStatus.counters[i].lastState; // Khởi tạo stableState
+    systemStatus.counters[i].lastDebounceTime = 0;
+    
+    Serial.printf("Counter %d: Pin %d, Initial State: %s, Stable State: %s, Filter: %dms, Count: %d\n", 
+                i+1, 
+                systemStatus.counters[i].pin,
+                systemStatus.counters[i].lastState ? "HIGH" : "LOW",
+                systemStatus.counters[i].stableState ? "HIGH" : "LOW",
+                systemStatus.counters[i].delayFilter,
+                systemStatus.counters[i].count);
+  }
+  Serial.println("Counter pins initialized");
+}
+
 // Save counter configuration to JSON
 void saveCounterConfig() {
   JSONVar config;
@@ -638,29 +659,33 @@ void loadCounterConfig() {
           systemStatus.counters[i].pin = (int)counterObj["pin"];
           systemStatus.counters[i].delayFilter = (int)counterObj["delayFilter"];
           systemStatus.counters[i].count = (int)counterObj["count"];
-          systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
-          systemStatus.counters[i].lastDebounceTime = 0;
         }
       }
+      
+      // Khởi tạo các chân counter sau khi load config
+      initCounters();
       
       Serial.println("Counter configuration loaded");
       sendDebugMessage("Counter configuration loaded from LittleFS");
     }
   } else {
     // Default configuration
-    systemStatus.counters[0].pin = 5;
-    systemStatus.counters[1].pin = 6;
-    systemStatus.counters[2].pin = 7;
-    systemStatus.counters[3].pin = 37;
+    systemStatus.counters[0].pin = 37;
+    systemStatus.counters[1].pin = 38;
+    systemStatus.counters[2].pin = 39;
+    systemStatus.counters[3].pin = 40;
     for (int i = 0; i < 4; i++) {
       systemStatus.counters[i].delayFilter = 50;
       systemStatus.counters[i].count = 0;
-      systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
-      systemStatus.counters[i].lastDebounceTime = 0;
     }
+    
+    // Khởi tạo các chân counter với config mặc định
+    initCounters();
+    
     saveCounterConfig();
   }
 }
+
 
 // Save admin credentials to JSON
 void saveAdminCredentials() {
@@ -740,18 +765,41 @@ void updateCounterStatus() {
   for (int i = 0; i < 4; i++) {
     bool currentState = digitalRead(systemStatus.counters[i].pin);
     
+    // debug thông tin
+    if (DEBUG_MODE && (currentTime % 1000 < 10)) { // In mỗi giây
+      Serial.printf("Counter %d (Pin %d): Current=%s, Last=%s, Stable=%s, Count=%d, TimeDiff=%lu\n", 
+                   i+1, systemStatus.counters[i].pin, 
+                   currentState ? "HIGH" : "LOW",
+                   systemStatus.counters[i].lastState ? "HIGH" : "LOW",
+                   systemStatus.counters[i].stableState ? "HIGH" : "LOW",
+                   systemStatus.counters[i].count,
+                   currentTime - systemStatus.counters[i].lastDebounceTime);
+    }
+    
+    // nếu trạng thái thay đổi so với lần đọc trước
     if (currentState != systemStatus.counters[i].lastState) {
       systemStatus.counters[i].lastDebounceTime = currentTime;
-    }
-
-    if ((currentTime - systemStatus.counters[i].lastDebounceTime) > systemStatus.counters[i].delayFilter) {
-      if (currentState != systemStatus.counters[i].lastState && currentState == LOW) { // Falling edge
-        systemStatus.counters[i].count++;
-        statusChanged = true;
-        String message = String("Counter ") + (i+1) + " (Pin " + systemStatus.counters[i].pin + ") incremented to " + systemStatus.counters[i].count;
-        sendDebugMessage(message);
-      }
       systemStatus.counters[i].lastState = currentState;
+    }
+    
+    // chỉ xử lý khi trạng thái ổn định đủ lâu
+    if ((currentTime - systemStatus.counters[i].lastDebounceTime) >= systemStatus.counters[i].delayFilter) {
+      // Nếu trạng thái hiện tại khác với trạng thái ổn định trước đó
+      if (currentState != systemStatus.counters[i].stableState) {
+        // Với INPUT_PULLUP, đếm khi có sườn xuống (HIGH -> LOW)
+        if (systemStatus.counters[i].stableState == HIGH && currentState == LOW) {
+          systemStatus.counters[i].count++;
+          statusChanged = true;
+          
+          String message = String("Counter ") + (i+1) + " (Pin " + systemStatus.counters[i].pin + 
+                         ") incremented to " + systemStatus.counters[i].count;
+          sendDebugMessage(message);
+          Serial.println(message);
+        }
+        
+        // cập nhật trạng thái ổn định mới
+        systemStatus.counters[i].stableState = currentState;
+      }
     }
   }
 
@@ -924,6 +972,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         systemStatus.counters[i].lastState = digitalRead(systemStatus.counters[i].pin);
         systemStatus.counters[i].lastDebounceTime = 0;
       }
+      initCounters();
       saveCounterConfig();
       sendCounterStatus();
     }
@@ -1054,7 +1103,7 @@ void updateSystemStatus() {
 
   checkAdminTimeout();
 
-  // Send system status message
+  // Send system status message - ENHANCED WITH COUNTER STATE
   String statusMessage = "=== System Status ===\n";
   statusMessage += String("Reset Count: ") + systemStatus.resetCount + "\n";
   statusMessage += "Inputs: ";
@@ -1067,7 +1116,14 @@ void updateSystemStatus() {
   }
   statusMessage += "\nCounters: ";
   for (int i = 0; i < 4; i++) {
-    statusMessage += String("Pin ") + systemStatus.counters[i].pin + ": " + systemStatus.counters[i].count + " ";
+    // Đọc trạng thái hiện tại của pin counter
+    bool currentPinState = digitalRead(systemStatus.counters[i].pin);
+    String pinStateStr = currentPinState ? "HIGH" : "LOW";
+    
+    statusMessage += String("Pin ") + systemStatus.counters[i].pin + 
+                    ": Count=" + systemStatus.counters[i].count + 
+                    " State=" + pinStateStr + 
+                    " Filter=" + systemStatus.counters[i].delayFilter + "ms ";
   }
   statusMessage += String("\nFree Heap: ") + systemStatus.freeHeap + " bytes\n";
   statusMessage += String("Free PSRAM: ") + systemStatus.freePsram + " bytes\n";
@@ -1106,6 +1162,15 @@ void webSocketTask(void *pvParameters) {
     vTaskDelay(webSocketPeriod);
   }
 }
+// void testCounterPins() {
+//   Serial.println("=== Testing Counter Pins ===");
+//   for (int i = 0; i < 4; i++) {
+//     bool state = digitalRead(systemStatus.counters[i].pin);
+//     Serial.printf("Counter %d (Pin %d): %s\n", i+1, systemStatus.counters[i].pin, state ? "HIGH" : "LOW");
+//   }
+//   Serial.println("=============================");
+// }
+
 
 void setup() {
   Serial.begin(SERIAL_BAUD_RATE);
@@ -1117,7 +1182,7 @@ void setup() {
   initInputs();
   initOutputs();
   initWiFi();
-  initLittleFS();
+  initLittleFS();  // Hàm này sẽ gọi loadCounterConfig() và initCounters()
   initLoRaE32();
   initWebSocket();
   sendDebugMessage("WebSocket server started");
@@ -1149,6 +1214,15 @@ void setup() {
   sendDebugMessage("Tasks created and running on Core 1");
 }
 
+
 void loop() {
+  // static unsigned long lastTestTime = 0;
+  
+  // // Test counter pins mỗi 10 giây
+  // if (millis() - lastTestTime > 10000) {
+  //   testCounterPins();
+  //   lastTestTime = millis();
+  // }
+  
   vTaskDelay(pdMS_TO_TICKS(1000));
 }

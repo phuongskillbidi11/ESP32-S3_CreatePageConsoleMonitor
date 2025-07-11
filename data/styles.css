@@ -1,46 +1,97 @@
-/* styles.css */
+/* Global Styles */
+body {
+  background-color: #f9fafb;
+  color: #1f2937;
+}
 
-/* Terminal styling */
+/* Container */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* Header and Sections */
+header, section {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Buttons */
+button {
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* Form Elements */
+select,
+input[type="number"],
+input[type="text"],
+input[type="password"] {
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  width: 100%;
+  transition: all 0.2s ease-in-out;
+}
+
+select:focus,
+input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Terminal Styling */
 #terminal {
   height: 200px;
   overflow-y: auto;
-  background-color: #1a1a1a;
+  background-color: #1f2937;
   color: #ffffff;
-  font-family: monospace;
-  padding: 10px;
+  font-family: 'Courier New', monospace;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
 }
 
-/* Input status styling */
+/* Input Status */
 .input-status {
-  background-color: #e0e0e0;
-  padding: 5px;
-  border-radius: 4px;
-  margin: 2px 0;
+  background-color: #e5e7eb;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  margin: 0.25rem 0;
 }
 
-/* Output button styling */
+/* Output Button */
 .output-btn {
-  transition: background-color 0.3s;
+  transition: background-color 0.3s ease;
 }
 
 .output-btn.on {
-  background-color: #10b981; /* Green */
+  background-color: #10b981;
 }
 
 .output-btn.off {
-  background-color: #ef4444; /* Red */
+  background-color: #ef4444;
 }
 
-/* LoRa information styling */
+/* LoRa Information */
 .lora-info {
   background-color: #f3f4f6;
-  padding: 10px;
-  border-radius: 6px;
-  margin: 5px 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .lora-info-label {
-  font-weight: bold;
+  font-weight: 600;
   color: #374151;
 }
 
@@ -48,15 +99,7 @@
   color: #1f2937;
 }
 
-/* Form elements styling */
-select, input[type="number"], input[type="text"], input[type="password"] {
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 5px;
-  width: 100%;
-}
-
-/* Configuration section visibility */
+/* Configuration Section */
 .config-section {
   display: none;
 }
@@ -65,9 +108,22 @@ select, input[type="number"], input[type="text"], input[type="password"] {
   display: block;
 }
 
-/* Change password section styling */
+/* Change Password Section */
 #change-password {
   background-color: #f3f4f6;
-  padding: 20px;
-  border-radius: 6px;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
 }

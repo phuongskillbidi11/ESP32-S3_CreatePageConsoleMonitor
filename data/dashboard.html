@@ -7,36 +7,36 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-gray-100 font-sans">
-  <div class="container mx-auto p-4">
+<body class="bg-gray-50 font-sans antialiased">
+  <div class="container mx-auto max-w-5xl p-6">
     <!-- Header -->
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-4">Product Counter Dashboard</h1>
-      <p id="connection-status" class="mb-4 text-lg">WebSocket: Disconnected</p>
-      <div class="flex justify-between">
-        <button onclick="showPage('admin')" class="bg-blue-500 text-white px-4 py-2 rounded">Admin Login</button>
-        <button onclick="saveConfig()" class="bg-green-500 text-white px-4 py-2 rounded">Save Configuration</button>
+    <header class="bg-white shadow-sm rounded-lg p-6 mb-8">
+      <h1 class="text-3xl font-bold text-gray-800 mb-3">Product Counter Dashboard</h1>
+      <p id="connection-status" class="text-lg text-gray-600">WebSocket: Disconnected</p>
+      <div class="flex justify-between items-center mt-4">
+        <button onclick="showPage('admin')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition duration-200">Admin Login</button>
+        <button onclick="saveConfig()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg transition duration-200">Save Configuration</button>
       </div>
-    </div>
+    </header>
 
     <!-- Plan Selection -->
-    <div class="mb-6">
-      <h3 class="font-semibold text-lg mb-2">Plan Display</h3>
-      <select id="plan-display" class="border p-2 rounded w-full" onchange="updatePlanDisplay()">
+    <section class="bg-white shadow-sm rounded-lg p-6 mb-8">
+      <h3 class="text-xl font-semibold text-gray-800 mb-3">Plan Selection</h3>
+      <select id="plan-display" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onchange="updatePlanDisplay()">
         <option value="0">Plan 1</option>
         <option value="1">Plan 2</option>
         <option value="2">Plan 3</option>
         <option value="3">Plan 4</option>
       </select>
-    </div>
+    </section>
 
     <!-- Counter Configuration -->
-    <div class="mb-6">
-      <h3 class="font-semibold text-lg mb-2">Counter Configuration</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="counter-config">
-          <label class="block font-semibold">Counter 1 Pin:</label>
-          <select id="counter-pin-1" class="border p-2 rounded w-full">
+    <section class="bg-white shadow-sm rounded-lg p-6 mb-8">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Counter Configuration</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="counter-config space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Counter 1 Pin</label>
+          <select id="counter-pin-1" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
             <option value="5">Pin 5</option>
             <option value="6">Pin 6</option>
             <option value="7">Pin 7</option>
@@ -45,13 +45,13 @@
             <option value="39">Pin 39</option>
             <option value="40">Pin 40</option>
           </select>
-          <label class="block font-semibold mt-2">Delay Filter (ms):</label>
-          <input type="number" id="delay-filter-1" value="50" min="0" max="1000" class="border p-2 rounded w-full">
-          <p>Count: <span id="counter-value-1">0</span></p>
+          <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
+          <input type="number" id="delay-filter-1" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
+          <p class="text-gray-600">Count: <span id="counter-value-1" class="font-medium">0</span></p>
         </div>
-        <div class="counter-config">
-          <label class="block font-semibold">Counter 2 Pin:</label>
-          <select id="counter-pin-2" class="border p-2 rounded w-full">
+        <div class="counter-config space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Counter 2 Pin</label>
+          <select id="counter-pin-2" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
             <option value="6">Pin 6</option>
             <option value="5">Pin 5</option>
             <option value="7">Pin 7</option>
@@ -60,13 +60,13 @@
             <option value="39">Pin 39</option>
             <option value="40">Pin 40</option>
           </select>
-          <label class="block font-semibold mt-2">Delay Filter (ms):</label>
-          <input type="number" id="delay-filter-2" value="50" min="0" max="1000" class="border p-2 rounded w-full">
-          <p>Count: <span id="counter-value-2">0</span></p>
+          <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
+          <input type="number" id="delay-filter-2" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
+          <p class="text-gray-600">Count: <span id="counter-value-2" class="font-medium">0</span></p>
         </div>
-        <div class="counter-config">
-          <label class="block font-semibold">Counter 3 Pin:</label>
-          <select id="counter-pin-3" class="border p-2 rounded w-full">
+        <div class="counter-config space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Counter 3 Pin</label>
+          <select id="counter-pin-3" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
             <option value="7">Pin 7</option>
             <option value="5">Pin 5</option>
             <option value="6">Pin 6</option>
@@ -75,13 +75,13 @@
             <option value="39">Pin 39</option>
             <option value="40">Pin 40</option>
           </select>
-          <label class="block font-semibold mt-2">Delay Filter (ms):</label>
-          <input type="number" id="delay-filter-3" value="50" min="0" max="1000" class="border p-2 rounded w-full">
-          <p>Count: <span id="counter-value-3">0</span></p>
+          <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
+          <input type="number" id="delay-filter-3" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
+          <p class="text-gray-600">Count: <span id="counter-value-3" class="font-medium">0</span></p>
         </div>
-        <div class="counter-config">
-          <label class="block font-semibold">Counter 4 Pin:</label>
-          <select id="counter-pin-4" class="border p-2 rounded w-full">
+        <div class="counter-config space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Counter 4 Pin</label>
+          <select id="counter-pin-4" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
             <option value="37">Pin 37</option>
             <option value="5">Pin 5</option>
             <option value="6">Pin 6</option>
@@ -90,29 +90,31 @@
             <option value="39">Pin 39</option>
             <option value="40">Pin 40</option>
           </select>
-          <label class="block font-semibold mt-2">Delay Filter (ms):</label>
-          <input type="number" id="delay-filter-4" value="50" min="0" max="1000" class="border p-2 rounded w-full">
-          <p>Count: <span id="counter-value-4">0</span></p>
+          <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
+          <input type="number" id="delay-filter-4" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
+          <p class="text-gray-600">Count: <span id="counter-value-4" class="font-medium">0</span></p>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Login Modal -->
-    <div id="login-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-      <div class="bg-white p-6 rounded shadow-lg">
-        <h3 class="text-lg font-semibold mb-4">Admin Login</h3>
-        <p id="login-error" class="text-red-500 hidden">Invalid username or password</p>
-        <div class="mb-4">
-          <label class="block font-semibold">Username:</label>
-          <input type="text" id="login-username" class="border p-2 rounded w-full" value="admin">
+    <div id="login-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center hidden">
+      <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Admin Login</h3>
+        <p id="login-error" class="text-red-500 text-sm hidden mb-4">Invalid username or password</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Username</label>
+            <input type="text" id="login-username" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500" value="admin">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Password</label>
+            <input type="password" id="login-password" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500" value="admin123">
+          </div>
         </div>
-        <div class="mb-4">
-          <label class="block font-semibold">Password:</label>
-          <input type="password" id="login-password" class="border p-2 rounded w-full" value="admin123">
-        </div>
-        <div class="flex justify-end space-x-4">
-          <button onclick="closeLoginModal()" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
-          <button onclick="login()" class="bg-blue-500 text-white px-4 py-2 rounded">Login</button>
+        <div class="flex justify-end space-x-4 mt-6">
+          <button onclick="closeLoginModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-5 py-2 rounded-lg transition duration-200">Cancel</button>
+          <button onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition duration-200">Login</button>
         </div>
       </div>
     </div>

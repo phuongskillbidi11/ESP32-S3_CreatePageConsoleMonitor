@@ -54,6 +54,7 @@ struct CounterConfig {
   unsigned long delayFilter; // Delay filter in milliseconds
   unsigned long count;
   bool lastState;
+  bool stableState; 
   unsigned long lastDebounceTime;
 };
 

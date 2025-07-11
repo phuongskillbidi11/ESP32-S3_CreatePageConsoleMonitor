@@ -4,7 +4,7 @@ const terminal = document.getElementById('terminal');
 
 // WebSocket initialization
 function initWebSocket() {
-  ws = new WebSocket(`ws://192.168.0.104/ws`);
+  // ws = new WebSocket(`ws://192.168.0.104/ws`);
 
   ws.onopen = () => {
     document.getElementById('connection-status').textContent = 'WebSocket: Connected';
@@ -20,7 +20,7 @@ function initWebSocket() {
       }
       updateStatus(data);
     } catch (e) {
-      console.error('Error parsing WebSocket message');
+      console.error('Error parsing WebSocket message');0
     }
   };
 
