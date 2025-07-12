@@ -35,6 +35,10 @@ const int NUM_OUTPUTS = 5;
 const unsigned long MONITOR_INTERVAL = 2000;
 const unsigned long WEBSOCKET_UPDATE_INTERVAL = 5000;
 
+// Counter configuration
+const unsigned long COUNTER_UPDATE_INTERVAL = 10; // 10ms
+const unsigned long DEFAULT_COUNTER_DELAY_FILTER = 20; // 20ms debounce
+
 // Temperature sensor configuration
 const float TEMP_OFFSET = -5.0;
 
@@ -51,11 +55,12 @@ RTC_DATA_ATTR int reset_counter = 0;
 // Counter configuration
 struct CounterConfig {
   int pin;
-  unsigned long delayFilter; // Delay filter in milliseconds
-  unsigned long count;
+  unsigned long delayFilter = DEFAULT_COUNTER_DELAY_FILTER;
+  volatile unsigned long count;  // Thêm volatile cho biến đa task
   bool lastState;
-  bool stableState; 
+  bool stableState;
   unsigned long lastDebounceTime;
+  unsigned long lastPulseTime;   // Thêm để theo dõi thời gian giữa các xung
 };
 
 // Admin credentials
@@ -121,6 +126,7 @@ struct SystemStatus {
   CounterConfig counters[4];
   bool adminMode = false;
   AdminCredentials adminCredentials;
+  int wifiRSSI;
 };
 
 // Function declarations

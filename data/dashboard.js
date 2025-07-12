@@ -5,6 +5,7 @@ const terminal = document.getElementById('terminal');
 // WebSocket initialization
 function initWebSocket() {
   // ws = new WebSocket(`ws://192.168.0.104/ws`);
+    ws = new WebSocket(`ws://${window.location.hostname}/ws`);
 
   ws.onopen = () => {
     document.getElementById('connection-status').textContent = 'WebSocket: Connected';
