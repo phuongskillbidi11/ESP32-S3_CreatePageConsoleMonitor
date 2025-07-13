@@ -52,6 +52,9 @@ void printParameters(struct Configuration configuration);
 void initCounters();
 void saveCounterConfig();
 void loadCounterConfig();
+void resetCounter(int counterIndex);
+void resetAllCounters();
+// Admin functions
 void saveAdminCredentials();
 void loadAdminCredentials();
 void sendCounterStatus();
@@ -83,22 +86,30 @@ void initOutputs() {
 
 // Initialize WiFi connection
 void initWiFi() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.setAutoReconnect(true);  //  tự động kết nối lại
+  WiFi.persistent(true);       // lưu cấu hình WiFi vào bộ nhớ
+  
   Serial.print("Connecting to WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    vTaskDelay(pdMS_TO_TICKS(1000));
+  unsigned long startAttemptTime = millis();
+  
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
+    vTaskDelay(pdMS_TO_TICKS(500));
     Serial.print(".");
   }
 
-  Serial.println();
-  Serial.println("WiFi connected!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  systemStatus.ipAddress = WiFi.localIP().toString();
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+    systemStatus.ipAddress = WiFi.localIP().toString();
+    sendDebugMessage("WiFi connected! IP: " + systemStatus.ipAddress);
+  } else {
+    Serial.println("\nFailed to connect WiFi, will retry in background");
+    sendDebugMessage("Failed to connect WiFi, auto-reconnecting...");
+  }
 }
-
 // Initialize LittleFS
 void initLittleFS() {
   if (!LittleFS.begin(true)) {
@@ -606,6 +617,25 @@ void initCounters() {
   }
   Serial.println("Counter pins initialized");
 }
+// Reset a specific counter
+void resetCounter(int counterIndex) {
+  if (counterIndex >= 0 && counterIndex < 4) {
+    systemStatus.counters[counterIndex].count = 0;
+    saveCounterConfig();
+    sendCounterStatus();
+    sendDebugMessage("Counter " + String(counterIndex + 1) + " reset");
+  }
+}
+
+// Reset all counters
+void resetAllCounters() {
+  for (int i = 0; i < 4; i++) {
+    systemStatus.counters[i].count = 0;
+  }
+  saveCounterConfig();
+  sendCounterStatus();
+  sendDebugMessage("All counters reset");
+}
 
 // Save counter configuration to JSON
 void saveCounterConfig() {
@@ -991,6 +1021,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       setLoRaOperatingMode(mode);
       sendSystemStatus();
     }
+    else if (action == "reset_counter") {
+      int counterIndex = (int)json["index"]; // 0-3
+      resetCounter(counterIndex);
+    }
+    else if (action == "reset_all_counters") {
+      resetAllCounters();
+    }
     else if (action == "set_counter_config") {
       systemStatus.planDisplay = (int)json["planDisplay"];
       JSONVar countersArray = json["counters"];
@@ -1089,6 +1126,15 @@ void clearTerminal() {
 void updateSystemStatus() {
   static SystemStatus lastStatus;
   bool statusChanged = false;
+  static unsigned long lastWifiCheck = 0;
+
+  if (millis() - lastWifiCheck > 10000) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected, reconnecting...");
+    WiFi.reconnect();
+  }
+  lastWifiCheck = millis();
+  }
   
   clearTerminal();
   
@@ -1170,8 +1216,8 @@ void updateSystemStatus() {
   statusMessage += "====================";
 
   static unsigned long lastLogTime = 0;
-  if (millis() - lastLogTime >= 5000) {
-    sendDebugMessage(statusMessage);
+  if (millis() - lastLogTime >= 1000) {  // 1s in ra 1 lần
+    Serial.println(statusMessage);
     lastLogTime = millis();
   }
 
@@ -1186,6 +1232,17 @@ void systemMonitorTask(void *pvParameters) {
   const TickType_t monitorPeriod = pdMS_TO_TICKS(MONITOR_INTERVAL);
   while (1) {
     updateSystemStatus();
+        // Kiểm tra WiFi status
+    static int lastWifiStatus = WL_CONNECTED;
+    int currentWifiStatus = WiFi.status();
+    if (currentWifiStatus != lastWifiStatus) {
+      if (currentWifiStatus == WL_CONNECTED) {
+        sendDebugMessage("WiFi connected! IP: " + WiFi.localIP().toString());
+      } else {
+        sendDebugMessage("WiFi disconnected!");
+      }
+      lastWifiStatus = currentWifiStatus;
+    }
     if (DEBUG_MODE) {
       Serial.printf("SystemMonitorTask Stack High Water Mark: %d bytes\n", uxTaskGetStackHighWaterMark(NULL));
     }
@@ -1200,7 +1257,29 @@ void counterMonitorTask(void *pvParameters) {
     vTaskDelay(counterPeriod);
   }
 }
-
+// WiFi monitoring task
+void wifiMonitorTask(void *pvParameters) {
+  const TickType_t wifiCheckPeriod = pdMS_TO_TICKS(WIFI_RECONNECT_INTERVAL);
+  
+  while (1) {
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi disconnected! Attempting to reconnect...");
+      WiFi.disconnect();
+      WiFi.reconnect();
+      
+      unsigned long start = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+      
+      if (WiFi.status() == WL_CONNECTED) {
+        systemStatus.ipAddress = WiFi.localIP().toString();
+        Serial.println("WiFi reconnected! IP: " + systemStatus.ipAddress);
+      }
+    }
+    vTaskDelay(wifiCheckPeriod);
+  }
+}
 // WebSocket task
 void webSocketTask(void *pvParameters) {
   const TickType_t webSocketPeriod = pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL);
@@ -1242,6 +1321,16 @@ void setup() {
   initInputs();
   initOutputs();
   initLittleFS();
+    // Thêm task này
+  xTaskCreatePinnedToCore(
+    wifiMonitorTask,
+    "WiFiMonitor",
+    2048,
+    NULL,
+    1,
+    NULL,
+    1
+  );
 
   xTaskCreatePinnedToCore(
     initTask,
@@ -1275,11 +1364,11 @@ void setup() {
   xTaskCreatePinnedToCore(
     counterMonitorTask,
     "CounterMonitor",
-    3072,  // Tăng từ 2048 lên 3072 bytes
+    3072,  
     NULL,
-    3,     // Priority
+    3,     
     NULL,
-    1      // Core 1
+    1      
   );
 }
 

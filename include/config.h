@@ -11,6 +11,8 @@
 
 const char* WIFI_SSID = "Heo vang 2019";
 const char* WIFI_PASSWORD = "Hungthinh210315";
+// WiFi Reconnect Interval
+#define WIFI_RECONNECT_INTERVAL 30000
 
 // WebSocket Configuration
 const int WEBSOCKET_PORT = 80;

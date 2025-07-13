@@ -65,7 +65,26 @@ function saveConfig() {
     ws.send(JSON.stringify(config));
   }
 }
+// Reset single counter (index 0-3)
+function resetCounter(counterIndex) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      action: 'reset_counter',
+      index: counterIndex
+    }));
+  }
+}
 
+// Reset all counters
+function resetAllCounters() {
+  if (confirm('Are you sure you want to reset ALL counters?')) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        action: 'reset_all_counters'
+      }));
+    }
+  }
+}
 // Login modal functions
 function showPage(pageId) {
   if (pageId === 'admin') {

@@ -48,6 +48,7 @@
           <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
           <input type="number" id="delay-filter-1" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
           <p class="text-gray-600">Count: <span id="counter-value-1" class="font-medium">0</span></p>
+          <button onclick="resetCounter(0)" class="reset-btn">Reset</button>
         </div>
         <div class="counter-config space-y-3">
           <label class="block text-sm font-medium text-gray-700">Counter 2 Pin</label>
@@ -63,6 +64,7 @@
           <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
           <input type="number" id="delay-filter-2" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
           <p class="text-gray-600">Count: <span id="counter-value-2" class="font-medium">0</span></p>
+          <button onclick="resetCounter(1)" class="reset-btn">Reset</button>
         </div>
         <div class="counter-config space-y-3">
           <label class="block text-sm font-medium text-gray-700">Counter 3 Pin</label>
@@ -78,6 +80,7 @@
           <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
           <input type="number" id="delay-filter-3" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
           <p class="text-gray-600">Count: <span id="counter-value-3" class="font-medium">0</span></p>
+          <button onclick="resetCounter(2)" class="reset-btn">Reset</button>
         </div>
         <div class="counter-config space-y-3">
           <label class="block text-sm font-medium text-gray-700">Counter 4 Pin</label>
@@ -93,7 +96,11 @@
           <label class="block text-sm font-medium text-gray-700">Delay Filter (ms)</label>
           <input type="number" id="delay-filter-4" value="50" min="0" max="1000" class="border border-gray-300 p-3 rounded-lg w-full focus:ring-2 focus:ring-blue-500">
           <p class="text-gray-600">Count: <span id="counter-value-4" class="font-medium">0</span></p>
+          <button onclick="resetCounter(3)" class="reset-btn">Reset</button>
         </div>
+        <div class="counter-actions">
+        <button onclick="resetAllCounters()" class="reset-all-btn">Reset All Counters</button>
+      </div>
       </div>
     </section>
 
